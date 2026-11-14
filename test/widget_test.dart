@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:whisky_note/data/note_store.dart';
 import 'package:whisky_note/main.dart';
 import 'package:whisky_note/models/tasting_note.dart';
+import 'package:whisky_note/widgets/flavor_wheel.dart';
 import 'package:whisky_note/widgets/whisky_bottle.dart';
 
 void main() {
@@ -68,5 +69,45 @@ void main() {
     await tester.tap(find.byTooltip('목록으로 보기'));
     await tester.pumpAndSettle();
     expect(find.text('Single Malt'), findsOneWidget);
+  });
+
+  testWidgets('(?)를 누르면 예시가 나오고 값은 바뀌지 않는다', (tester) async {
+    final values = List<int>.filled(aromaAxes.length, 0);
+    var changed = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 380,
+            child: FlavorWheel(
+              axes: aromaAxes,
+              values: values,
+              onChanged: (_, _) => changed = true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byIcon(Icons.help_outline).at(4)); // 4번 축 = 이탄
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('요오드'), findsOneWidget);
+    expect(changed, isFalse);
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('맛 차트에는 (?) 버튼 없이 숫자만 나온다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 380,
+            child: FlavorWheel(axes: palateAxes, values: [3, 0, 0, 0, 0, 7]),
+          ),
+        ),
+      ),
+    );
+    expect(find.byIcon(Icons.help_outline), findsNothing);
+    expect(find.text('3'), findsOneWidget);
+    expect(find.text('7'), findsOneWidget);
   });
 }

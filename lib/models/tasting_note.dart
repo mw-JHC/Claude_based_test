@@ -21,23 +21,23 @@ enum WhiskyType {
   }
 }
 
-/// 레이더 차트의 축 하나 (예: 곡물 - 밀가루 · 쌀 · 호밀빵).
+/// 레이더 차트의 축 하나 (예: 곡물). [examples]는 (?) 버튼을 누르면 보이는 예시입니다.
 class FlavorAxis {
-  const FlavorAxis(this.label, [this.hint = '']);
+  const FlavorAxis(this.label, [this.examples = const []]);
   final String label;
-  final String hint;
+  final List<String> examples;
 }
 
 /// 향(Nose)과 비후방 후각(Retronasal)에 쓰는 8개 축. 위에서부터 시계방향.
 const aromaAxes = <FlavorAxis>[
-  FlavorAxis('곡물', '밀가루 · 쌀 · 호밀빵'),
-  FlavorAxis('과일', '말린 · 익힌 · 신선한'),
-  FlavorAxis('꽃', '꽃향 · 식물 · 풀'),
-  FlavorAxis('나무', '마른 · 젖은 · 오래된'),
-  FlavorAxis('이탄', '병원 · 훈제 · 이끼'),
-  FlavorAxis('아로마', '바닐라 · 너트 · 아세톤'),
-  FlavorAxis('질감', '초콜릿 · 오일 · 버터'),
-  FlavorAxis('기타', '가죽 · 고무 · 흙'),
+  FlavorAxis('곡물', ['밀가루', '호밀빵', '쌀', '끓인 곡물']),
+  FlavorAxis('과일', ['말린 과일', '익힌 과일', '신선한 과일', '시트러스', '포도', '사과', '레몬', '배']),
+  FlavorAxis('꽃', ['꽃향', '식물', '건초', '풀']),
+  FlavorAxis('나무', ['오래된', '마른', '젖은', '쪼개진', '새 가구']),
+  FlavorAxis('이탄', ['병원', '훈제', '이끼', '요오드', '타지 않은 숯향', '타고 남은 숯향']),
+  FlavorAxis('아로마', ['바닐라', '너트', '아세톤']),
+  FlavorAxis('질감', ['꿀', '초콜릿', '오일', '푸풋함', '버터']),
+  FlavorAxis('기타', ['황', '플라스틱', '가죽', '담배', '고무', '흙']),
 ];
 
 /// 맛(Palate)에 쓰는 6개 축. 위에서부터 시계방향.

@@ -23,6 +23,7 @@
 - 데이터는 폰 안에만 저장됩니다(앱 전용 폴더의 `whisky_notes.json`과 `photos/`).
 
 레이더 차트는 **누르거나 끌어서** 값을 정합니다. 중심이 0이고 바깥 원이 10입니다.
+각 축 이름 옆에 값이 표시되고, 향과 비후방 후각은 이름 옆 **(?)** 를 누르면 예시(예: 이탄 → 병원, 훈제, 이끼 …)가 나옵니다.
 
 ## 코드 구조
 
@@ -39,8 +40,8 @@ lib/
   widgets/
     cabinet_view.dart           진열장 (선반, 조명, 기울이기)
     whisky_bottle.dart          위스키 병 그리기
-    radar_chart.dart            원형 레이더 차트 (직접 그림, 터치 입력)
-    flavor_wheel.dart           차트 + 항목 설명 칩
+    radar_chart.dart            원형 레이더 차트 (축 이름, 값, (?) 예시, 터치 입력)
+    flavor_wheel.dart           차트 칸 (안내 문구 + 차트)
     color_scale.dart            색상 막대
     character_slider.dart       개성 막대
     sheet_section.dart          PDF 스타일 제목 막대가 달린 칸
@@ -48,7 +49,7 @@ lib/
 test/widget_test.dart           저장 형식과 노트 작성 흐름 테스트
 ```
 
-축 이름이나 설명을 바꾸고 싶으면 `lib/models/tasting_note.dart`의 `aromaAxes`, `palateAxes`, `characterScales`만 고치면 됩니다.
+축 이름이나 (?) 예시를 바꾸고 싶으면 `lib/models/tasting_note.dart`의 `aromaAxes`, `palateAxes`, `characterScales`만 고치면 됩니다.
 
 ## Windows에서 실행하기
 

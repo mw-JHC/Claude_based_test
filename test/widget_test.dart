@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:whisky_note/data/note_store.dart';
 import 'package:whisky_note/main.dart';
 import 'package:whisky_note/models/tasting_note.dart';
+import 'package:whisky_note/widgets/whisky_bottle.dart';
 
 void main() {
   test('노트를 JSON으로 저장했다가 그대로 다시 읽을 수 있다', () {
@@ -43,7 +44,7 @@ void main() {
     await tester.pump();
     expect(find.text('아직 기록한 위스키가 없습니다'), findsOneWidget);
 
-    await tester.tap(find.text('새 노트'));
+    await tester.tap(find.text('Add Whisky'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.widgetWithText(TextField, '이름 / Name *'),
@@ -53,7 +54,19 @@ void main() {
     await tester.tap(find.byTooltip('저장'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Lagavulin 16'), findsOneWidget);
     expect(store.notes.single.type, WhiskyType.singleMalt);
+
+    // 진열장: 병 라벨과 이름표에 이름이 보이고, 병을 누르면 노트가 열린다.
+    expect(find.text('Lagavulin 16'), findsWidgets);
+    await tester.tap(find.byType(WhiskyBottle));
+    await tester.pumpAndSettle();
+    expect(find.text('Whiskey Tasting Note'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // 목록 보기로 바꿀 수 있다.
+    await tester.tap(find.byTooltip('목록으로 보기'));
+    await tester.pumpAndSettle();
+    expect(find.text('Single Malt'), findsOneWidget);
   });
 }

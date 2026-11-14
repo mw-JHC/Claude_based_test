@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../data/note_store.dart';
 import '../models/tasting_note.dart';
 import '../theme.dart';
+import '../widgets/cabinet_view.dart';
 import '../widgets/color_scale.dart';
 import '../widgets/note_photo.dart';
 import 'note_detail_screen.dart';
@@ -33,17 +34,35 @@ class _NoteListScreenState extends State<NoteListScreen> {
     ].any((s) => s.toLowerCase().contains(q));
   }
 
+  /// true: 진열장 보기, false: 목록 보기
+  bool _cabinet = true;
+
+  void _open(TastingNote note) => Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => NoteDetailScreen(store: widget.store, noteId: note.id),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
     return Scaffold(
-      appBar: AppBar(title: const Text('Whisky Note')),
+      appBar: AppBar(
+        title: const Text('Whisky Library'),
+        actions: [
+          IconButton(
+            tooltip: _cabinet ? '목록으로 보기' : '진열장으로 보기',
+            icon: Icon(_cabinet ? Icons.view_list : Icons.shelves),
+            onPressed: () => setState(() => _cabinet = !_cabinet),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.of(
           context,
         ).push(MaterialPageRoute(builder: (_) => NoteEditScreen(store: store))),
         icon: const Icon(Icons.add),
-        label: const Text('새 노트'),
+        label: const Text('Add Whisky'),
       ),
       body: ListenableBuilder(
         listenable: store,
@@ -52,7 +71,16 @@ class _NoteListScreenState extends State<NoteListScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           final all = store.notes;
-          if (all.isEmpty) return const _EmptyState();
+          if (all.isEmpty) {
+            return _cabinet
+                ? CabinetView(
+                    store: store,
+                    notes: const [],
+                    onOpen: _open,
+                    emptyMessage: const _EmptyState(onDark: true),
+                  )
+                : const _EmptyState();
+          }
           final notes = all.where(_matches).toList();
           return Column(
             children: [
@@ -77,12 +105,14 @@ class _NoteListScreenState extends State<NoteListScreen> {
                 ),
               ),
               Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 96),
-                  itemCount: notes.length,
-                  itemBuilder: (context, i) =>
-                      _NoteCard(store: store, note: notes[i]),
-                ),
+                child: _cabinet
+                    ? CabinetView(store: store, notes: notes, onOpen: _open)
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 96),
+                        itemCount: notes.length,
+                        itemBuilder: (context, i) =>
+                            _NoteCard(store: store, note: notes[i]),
+                      ),
               ),
             ],
           );
@@ -190,30 +220,52 @@ class _NoteCard extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  const _EmptyState({this.onDark = false});
+
+  /// 진열장(어두운 배경) 위에 띄울 때는 반투명 상자 안에 보여줍니다.
+  final bool onDark;
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.local_bar, size: 64, color: NoteColors.amber),
-            SizedBox(height: 16),
-            Text(
-              '아직 기록한 위스키가 없습니다',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8),
-            Text(
-              '아래 "새 노트" 버튼으로 첫 테이스팅 노트를 남겨보세요.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: NoteColors.hint),
-            ),
-          ],
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.local_bar, size: 64, color: NoteColors.amber),
+        const SizedBox(height: 16),
+        Text(
+          '아직 기록한 위스키가 없습니다',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: onDark ? NoteColors.gold : null,
+          ),
         ),
+        const SizedBox(height: 8),
+        Text(
+          '아래 "Add Whisky" 버튼으로 첫 병을 진열해 보세요.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: onDark ? const Color(0xFFE8D9BC) : NoteColors.hint,
+          ),
+        ),
+      ],
+    );
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: onDark
+            ? Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: NoteColors.gold.withValues(alpha: 0.6),
+                  ),
+                ),
+                child: content,
+              )
+            : content,
       ),
     );
   }

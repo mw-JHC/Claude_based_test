@@ -112,7 +112,12 @@ class WhiskyBottle extends StatelessWidget {
             right: width * 0.10,
             top: labelTop,
             height: labelHeight,
-            child: _Label(note: note, photo: photo),
+            // 작은 병(목록 썸네일)에는 글자가 읽히지 않으니 라벨만 둡니다.
+            child: _Label(
+              note: note,
+              photo: photo,
+              textSize: height < 110 ? null : 8 * height / 150,
+            ),
           ),
           // 라벨 위에도 유리 반사광이 지나가도록 한 번 더 그립니다.
           Positioned.fill(
@@ -127,10 +132,11 @@ class WhiskyBottle extends StatelessWidget {
 }
 
 class _Label extends StatelessWidget {
-  const _Label({required this.note, this.photo});
+  const _Label({required this.note, this.photo, this.textSize});
 
   final TastingNote note;
   final ImageProvider? photo;
+  final double? textSize;
 
   @override
   Widget build(BuildContext context) {
@@ -170,18 +176,20 @@ class _Label extends StatelessWidget {
     ),
     padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
     alignment: Alignment.center,
-    child: Text(
-      note.name,
-      textAlign: TextAlign.center,
-      maxLines: 3,
-      overflow: TextOverflow.ellipsis,
-      style: const TextStyle(
-        fontSize: 8,
-        height: 1.1,
-        fontWeight: FontWeight.bold,
-        color: NoteColors.ink,
-      ),
-    ),
+    child: textSize == null
+        ? null
+        : Text(
+            note.name,
+            textAlign: TextAlign.center,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: textSize,
+              height: 1.1,
+              fontWeight: FontWeight.bold,
+              color: NoteColors.ink,
+            ),
+          ),
   );
 }
 

@@ -6,6 +6,7 @@ import 'package:whisky_note/data/app_settings.dart';
 import 'package:whisky_note/data/note_store.dart';
 import 'package:whisky_note/main.dart';
 import 'package:whisky_note/models/tasting_note.dart';
+import 'package:whisky_note/screens/note_detail_screen.dart';
 import 'package:whisky_note/widgets/flavor_wheel.dart';
 import 'package:whisky_note/widgets/whisky_bottle.dart';
 
@@ -65,14 +66,14 @@ void main() {
     expect(find.text('Lagavulin 16'), findsWidgets);
     await tester.tap(find.byType(WhiskyBottle));
     await tester.pumpAndSettle();
-    expect(find.text('Whiskey Tasting Note'), findsOneWidget);
-    await tester.pageBack();
+    expect(find.byType(NoteDetailScreen), findsOneWidget);
+    await tester.tap(find.byTooltip('뒤로'));
     await tester.pumpAndSettle();
 
     // 목록 보기로 바꿀 수 있다.
     await tester.tap(find.byTooltip('목록으로 보기'));
     await tester.pumpAndSettle();
-    expect(find.text('Single Malt'), findsOneWidget);
+    expect(find.text('SINGLE MALT'), findsOneWidget);
     await tester.tap(find.byTooltip('진열장으로 보기'));
     await tester.pumpAndSettle();
 
@@ -89,7 +90,7 @@ void main() {
     // 박물관 케이스는 받침대에 비친 반사까지 그려서 병이 두 번 나온다 (첫 번째가 실제 병).
     await tester.tap(find.byType(WhiskyBottle).first);
     await tester.pumpAndSettle();
-    expect(find.text('Whiskey Tasting Note'), findsOneWidget);
+    expect(find.byType(NoteDetailScreen), findsOneWidget);
   });
 
   testWidgets('(?)를 누르면 예시가 나오고 값은 바뀌지 않는다', (tester) async {

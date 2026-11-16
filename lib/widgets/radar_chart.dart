@@ -178,7 +178,7 @@ class _AxisLabel extends StatelessWidget {
         Text(
           axis.label,
           style: const TextStyle(
-            color: Colors.black87,
+            color: NoteColors.text,
             fontSize: 13,
             fontWeight: FontWeight.bold,
           ),
@@ -191,16 +191,16 @@ class _AxisLabel extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 2),
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
       decoration: BoxDecoration(
-        color: active ? color : Colors.white.withValues(alpha: 0.6),
+        color: active ? color : NoteColors.surfaceHigh,
         borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: active ? color : Colors.black12),
+        border: Border.all(color: active ? color : NoteColors.line),
       ),
       child: Text(
         '$value',
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
-          color: active ? Colors.white : Colors.black38,
+          color: active ? NoteColors.ink : NoteColors.faint,
         ),
       ),
     );
@@ -283,9 +283,20 @@ class _RadarPainter extends CustomPainter {
       return c + Offset(math.cos(a), math.sin(a)) * r * frac;
     }
 
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            color.withValues(alpha: 0.10),
+            color.withValues(alpha: 0.02),
+          ],
+        ).createShader(Rect.fromCircle(center: c, radius: r)),
+    );
     final grid = Paint()
       ..style = PaintingStyle.stroke
-      ..color = Colors.black54
+      ..color = NoteColors.line
       ..strokeWidth = 0.6;
     for (var k = 1; k <= max; k++) {
       canvas.drawCircle(c, r * k / max, grid);

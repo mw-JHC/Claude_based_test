@@ -40,35 +40,42 @@ class ColorScalePicker extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          height: 36,
-          child: Row(
-            children: [
-              for (var i = 0; i < _count; i++)
-                Expanded(
-                  child: GestureDetector(
-                    onTap: onChanged == null
-                        ? null
-                        : () => onChanged!(selected == i ? null : i / 10),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: whiskyColor(i / 10),
-                        border: selected == i
-                            ? Border.all(color: Colors.black, width: 3)
-                            : null,
+        // 둥근 막대 (선택 테두리가 잘리지 않게 바깥은 둥글게만 자릅니다)
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(
+            height: 40,
+            child: Row(
+              children: [
+                for (var i = 0; i < _count; i++)
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: onChanged == null
+                          ? null
+                          : () => onChanged!(selected == i ? null : i / 10),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: whiskyColor(i / 10),
+                          border: selected == i
+                              ? Border.all(color: NoteColors.text, width: 2.5)
+                              : null,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             for (final t in ['0.0', '0.5', '1.0', '1.5', '2.0'])
-              Text(t, style: const TextStyle(fontSize: 11)),
+              Text(
+                t,
+                style: const TextStyle(fontSize: 11, color: NoteColors.hint),
+              ),
           ],
         ),
         if (value != null)
@@ -79,7 +86,7 @@ class ColorScalePicker extends StatelessWidget {
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
-                color: NoteColors.leather,
+                color: NoteColors.gold,
               ),
             ),
           ),

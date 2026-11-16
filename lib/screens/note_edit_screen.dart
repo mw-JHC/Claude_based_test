@@ -232,7 +232,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     final isNew = widget.original == null;
     return Scaffold(
       appBar: AppBar(
-        title: Text(isNew ? '새 테이스팅 노트' : '노트 수정'),
+        title: Text(isNew ? 'New Whisky' : 'Edit Note'),
         actions: [
           IconButton(
             tooltip: '저장',
@@ -241,9 +241,34 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
           ),
         ],
       ),
+      // 저장 버튼은 화면 아래에 늘 떠 있습니다.
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+          decoration: const BoxDecoration(
+            color: NoteColors.bg,
+            border: Border(top: BorderSide(color: NoteColors.line)),
+          ),
+          child: FilledButton.icon(
+            onPressed: _saving || _processing ? null : _save,
+            icon: _saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.check),
+            label: Text(isNew ? '진열장에 저장' : '변경 사항 저장'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+            ),
+          ),
+        ),
+      ),
       body: SafeArea(
+        bottom: false,
         child: ListView(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
           children: [
             _photoSection(),
             _basicInfo(),
@@ -270,7 +295,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
               child: FlavorWheel(
                 axes: palateAxes,
                 values: _note.palate,
-                color: const Color(0xFFB0202A),
+                color: palateColor,
                 onChanged: (i, v) => setState(() => _note.palate[i] = v),
               ),
             ),
@@ -280,13 +305,13 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
               child: FlavorWheel(
                 axes: aromaAxes,
                 values: _note.retronasal,
-                color: const Color(0xFF3F5E2E),
+                color: retronasalColor,
                 onChanged: (i, v) => setState(() => _note.retronasal[i] = v),
               ),
             ),
             SheetSection(
               title: '개성',
-              subtitle: 'Characters',
+              subtitle: 'Character',
               child: Column(
                 children: [
                   for (final s in characterScales)
@@ -320,16 +345,6 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                 ),
               ),
             ),
-            FilledButton.icon(
-              onPressed: _saving ? null : _save,
-              icon: const Icon(Icons.save),
-              label: const Text('저장'),
-              style: FilledButton.styleFrom(
-                backgroundColor: NoteColors.leather,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
-            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -354,7 +369,8 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     );
 
     return SheetSection(
-      title: 'Whiskey Tasting Note',
+      title: '기본 정보',
+      subtitle: 'Details',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -366,7 +382,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                 ChoiceChip(
                   label: Text(t.label),
                   selected: _note.type == t,
-                  selectedColor: NoteColors.gold,
+                  showCheckmark: false,
                   onSelected: (on) =>
                       setState(() => _note.type = on ? t : null),
                 ),
@@ -436,7 +452,10 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
           if (_processing)
             Container(
               height: 280,
-              color: NoteColors.ink,
+              decoration: BoxDecoration(
+                color: NoteColors.ink,
+                borderRadius: BorderRadius.circular(18),
+              ),
               alignment: Alignment.center,
               child: const Column(
                 mainAxisSize: MainAxisSize.min,
@@ -452,9 +471,9 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
             )
           else if (photo != null) ...[
             ClipRRect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(18),
               child: SizedBox(
-                height: 280,
+                height: 300,
                 child: NotePhoto(
                   image: showCutout ? cutout : photo,
                   cutout: showCutout,
@@ -483,12 +502,41 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                 ),
               ),
           ] else
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                '병을 찍으면 배경을 지워 진열장에 세우고,\n라벨을 읽어 이름과 숙성 연수를 채워 드려요.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: NoteColors.hint, height: 1.4),
+            // 사진이 없을 때: 눌러서 바로 촬영할 수 있는 빈 칸
+            InkWell(
+              onTap: _takePhoto,
+              borderRadius: BorderRadius.circular(18),
+              child: Container(
+                height: 170,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: const RadialGradient(
+                    center: Alignment(0, -0.2),
+                    radius: 1.1,
+                    colors: [Color(0x33D99A4E), NoteColors.ink],
+                  ),
+                  border: Border.all(color: NoteColors.line),
+                ),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.photo_camera_outlined,
+                      size: 34,
+                      color: NoteColors.gold,
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      '병을 찍으면 배경을 지워 진열장에 세우고\n라벨을 읽어 이름과 숙성 연수를 채워 드려요',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: NoteColors.hint,
+                        height: 1.5,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           const SizedBox(height: 8),
@@ -499,9 +547,6 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                   onPressed: _processing ? null : _takePhoto,
                   icon: const Icon(Icons.photo_camera),
                   label: const Text('병 촬영'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: NoteColors.leather,
-                  ),
                 ),
               ),
               const SizedBox(width: 8),

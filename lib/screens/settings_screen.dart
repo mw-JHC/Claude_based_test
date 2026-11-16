@@ -20,14 +20,14 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('설정')),
+      appBar: AppBar(title: const Text('Settings')),
       body: ListenableBuilder(
         listenable: settings,
         builder: (context, _) => ListView(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
           children: [
             SheetSection(
-              title: '진열장',
+              title: '진열장 분위기',
               subtitle: 'Cabinet',
               child: Column(
                 children: [
@@ -76,10 +76,10 @@ class _StyleOption extends StatelessWidget {
           duration: const Duration(milliseconds: 150),
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
+            color: NoteColors.surface,
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: selected ? NoteColors.amber : Colors.black12,
+              color: selected ? NoteColors.amber : NoteColors.line,
               width: selected ? 3 : 1,
             ),
           ),
@@ -137,7 +137,7 @@ class _StyleOption extends StatelessWidget {
                       selected
                           ? Icons.check_circle
                           : Icons.radio_button_unchecked,
-                      color: selected ? NoteColors.amber : Colors.black26,
+                      color: selected ? NoteColors.amber : NoteColors.faint,
                     ),
                   ],
                 ),

@@ -33,16 +33,20 @@ class _NoteListScreenState extends State<NoteListScreen> {
   /// 종류 필터 (null이면 전체)
   WhiskyType? _type;
 
+  /// 산지 필터 (null이면 전체)
+  WhiskyOrigin? _origin;
+
   /// true: 진열장 보기, false: 목록 보기
   bool _cabinet = true;
 
   bool _matches(TastingNote n) {
     if (_type != null && n.type != _type) return false;
+    if (_origin != null && n.origin != _origin) return false;
     if (_query.isEmpty) return true;
     final q = _query.toLowerCase();
     return [
       n.name,
-      n.region,
+      n.regionLabel,
       n.ageCask,
       n.type?.label ?? '',
       n.overall,
@@ -78,7 +82,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _header(all),
-                if (all.isNotEmpty) ...[_searchBar(), _typeFilter(all)],
+                if (all.isNotEmpty) ...[_searchBar(), _filters(all)],
                 const SizedBox(height: 8),
                 Expanded(
                   child: !store.loaded
@@ -93,6 +97,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                             style: style,
                             notes: notes,
                             onOpen: _open,
+                            onPickStyle: _pickStyle,
                             emptyMessage: all.isEmpty
                                 ? const _EmptyState(onDark: true)
                                 : const _NoMatch(),
@@ -169,7 +174,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
           const SizedBox(width: 8),
           _RoundIconButton(
             tooltip: '설정',
-            icon: Icons.tune,
+            icon: Icons.settings_outlined,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => SettingsScreen(
@@ -208,52 +213,123 @@ class _NoteListScreenState extends State<NoteListScreen> {
     ),
   );
 
-  /// 가지고 있는 종류만 필터로 보여줍니다.
-  Widget _typeFilter(List<TastingNote> all) {
+  /// 가지고 있는 산지와 종류만 필터로 보여줍니다. 둘은 함께 걸 수 있습니다.
+  Widget _filters(List<TastingNote> all) {
+    final origins = WhiskyOrigin.values
+        .where((o) => all.any((n) => n.origin == o))
+        .toList();
     final types = WhiskyType.values
         .where((t) => all.any((n) => n.type == t))
         .toList();
-    if (types.length < 2) return const SizedBox.shrink();
-    Widget chip(String label, WhiskyType? t) {
-      final on = _type == t;
-      return Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: Semantics(
-          button: true,
-          selected: on,
-          child: GestureDetector(
-            onTap: () => setState(() => _type = t),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: on ? NoteColors.amber : NoteColors.surfaceHigh,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: on ? NoteColors.ink : NoteColors.text,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
+    if (origins.length < 2 && types.length < 2) return const SizedBox.shrink();
+    Widget pill(String label, bool on, VoidCallback onTap) => Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: SelectPill(label: label, selected: on, onTap: onTap),
+    );
     return SizedBox(
       height: 36,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        children: [chip('전체', null), for (final t in types) chip(t.label, t)],
+        children: [
+          pill('전체', _origin == null && _type == null, () {
+            setState(() {
+              _origin = null;
+              _type = null;
+            });
+          }),
+          if (origins.length >= 2)
+            for (final o in origins)
+              pill(o.label, _origin == o, () {
+                setState(() => _origin = _origin == o ? null : o);
+              }),
+          if (origins.length >= 2 && types.length >= 2)
+            Container(
+              width: 1,
+              margin: const EdgeInsets.fromLTRB(2, 8, 10, 8),
+              color: NoteColors.line,
+            ),
+          if (types.length >= 2)
+            for (final t in types)
+              pill(t.label, _type == t, () {
+                setState(() => _type = _type == t ? null : t);
+              }),
+        ],
       ),
     );
   }
+
+  /// 진열장 아래 이름을 누르면 바로 분위기를 바꿀 수 있습니다.
+  Future<void> _pickStyle() async {
+    final settings = widget.settings;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: NoteColors.surface,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (c) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(left: 4, bottom: 8),
+                child: Text(
+                  '진열장 분위기',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: NoteColors.text,
+                  ),
+                ),
+              ),
+              for (final style in CabinetStyle.values)
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  selected: settings.cabinetStyle == style,
+                  selectedTileColor: NoteColors.surfaceHigh,
+                  leading: Icon(_styleIcon(style), color: NoteColors.gold),
+                  title: Text(
+                    style.label,
+                    style: const TextStyle(
+                      color: NoteColors.text,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    style.description,
+                    style: const TextStyle(
+                      color: NoteColors.hint,
+                      fontSize: 12,
+                    ),
+                  ),
+                  trailing: settings.cabinetStyle == style
+                      ? const Icon(Icons.check_circle, color: NoteColors.amber)
+                      : null,
+                  onTap: () {
+                    settings.setCabinetStyle(style);
+                    Navigator.of(c).pop();
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static IconData _styleIcon(CabinetStyle s) => switch (s) {
+    CabinetStyle.woodShop => Icons.door_sliding_outlined,
+    CabinetStyle.backBar => Icons.wine_bar_outlined,
+    CabinetStyle.museum => Icons.museum_outlined,
+  };
 }
 
 class _RoundIconButton extends StatelessWidget {
@@ -297,7 +373,7 @@ class _NoteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sub = [
-      if (note.region.isNotEmpty) note.region,
+      if (note.regionLabel.isNotEmpty) note.regionLabel,
       if (note.ageCask.isNotEmpty) note.ageCask,
       if (note.abv != null) '${note.abv}%',
     ].join(' · ');

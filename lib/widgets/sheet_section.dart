@@ -172,3 +172,64 @@ class _RingPainter extends CustomPainter {
   @override
   bool shouldRepaint(_RingPainter old) => old.fraction != fraction;
 }
+
+/// 고를 수 있는 둥근 버튼 (종류, 산지, 필터).
+class SelectPill extends StatelessWidget {
+  const SelectPill({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.small = false,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  /// 세부 지역처럼 한 단계 아래 선택지는 작고 테두리만 있는 모양.
+  final bool small;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = selected
+        ? (small ? NoteColors.amber.withValues(alpha: 0.18) : NoteColors.amber)
+        : (small ? Colors.transparent : NoteColors.surfaceHigh);
+    final fg = selected
+        ? (small ? NoteColors.gold : NoteColors.ink)
+        : (small ? NoteColors.hint : NoteColors.text);
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          height: small ? 32 : 36,
+          padding: EdgeInsets.symmetric(horizontal: small ? 12 : 16),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(20),
+            border: small
+                ? Border.all(
+                    color: selected ? NoteColors.amber : NoteColors.line,
+                  )
+                : null,
+          ),
+          // 글자 너비만큼만 차지하고 세로로는 가운데 정렬.
+          child: Center(
+            widthFactor: 1,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: small ? 12.5 : 13,
+                fontWeight: FontWeight.w600,
+                color: fg,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -13,7 +13,8 @@ class LabelGuess {
     this.brand,
     this.age,
     this.type,
-    this.region,
+    this.origin,
+    this.subRegion = '',
     this.words = const [],
   });
 
@@ -23,7 +24,10 @@ class LabelGuess {
   /// 숙성 연수 (예: 16)
   final int? age;
   final WhiskyType? type;
-  final String? region;
+
+  /// 산지와 세부 지역 (예: Scotland, Highland)
+  final WhiskyOrigin? origin;
+  final String subRegion;
 
   /// 라벨에서 읽은 글자들 (큰 글자부터). 이름에 덧붙일 후보로 보여줍니다.
   final List<String> words;
@@ -125,44 +129,29 @@ LabelGuess parseLabel(List<OcrLine> raw) {
   ]..sort((a, b) => b.height.compareTo(a.height));
   if (lines.isEmpty) return const LabelGuess();
   final all = lines.map((l) => l.text.toUpperCase()).join(' ');
+  final origin = originFromText(all);
 
   return LabelGuess(
     brand: _brand(lines),
     age: _age(lines),
     type: _type(all),
-    region: _region(all),
+    origin: origin?.$1,
+    subRegion: origin?.$2 ?? '',
     words: _words(lines),
   );
 }
 
 WhiskyType? _type(String all) {
-  if (all.contains('BOURBON')) return WhiskyType.bourbon;
-  if (all.contains('JAPAN')) return WhiskyType.japanese;
-  if (all.contains('BLENDED')) return WhiskyType.blended;
-  if (all.contains('SINGLE MALT')) return WhiskyType.singleMalt;
-  return null;
-}
-
-String? _region(String all) {
-  const regions = [
-    ('ISLAY', 'Scotland / Islay'),
-    ('SPEYSIDE', 'Scotland / Speyside'),
-    ('CAMPBELTOWN', 'Scotland / Campbeltown'),
-    ('LOWLAND', 'Scotland / Lowland'),
-    ('HIGHLAND', 'Scotland / Highland'),
-    ('SCOTCH', 'Scotland'),
-    ('SCOTLAND', 'Scotland'),
-    ('KENTUCKY', 'USA / Kentucky'),
-    ('TENNESSEE', 'USA / Tennessee'),
-    ('IRISH', 'Ireland'),
-    ('IRELAND', 'Ireland'),
-    ('JAPAN', 'Japan'),
-    ('BAVARIA', 'Germany / Bavaria'),
-    ('TAIWAN', 'Taiwan'),
-  ];
-  for (final (key, value) in regions) {
-    if (all.contains(key)) return value;
+  // 더 구체적인 이름부터 확인합니다 (BLENDED MALT가 BLENDED보다 먼저).
+  if (all.contains('SINGLE GRAIN')) return WhiskyType.singleGrain;
+  if (all.contains('BLENDED MALT') ||
+      all.contains('PURE MALT') ||
+      all.contains('VATTED')) {
+    return WhiskyType.blendedMalt;
   }
+  if (all.contains('BLENDED GRAIN')) return WhiskyType.blendedGrain;
+  if (all.contains('SINGLE MALT')) return WhiskyType.singleMalt;
+  if (all.contains('BLENDED')) return WhiskyType.blended;
   return null;
 }
 

@@ -179,7 +179,7 @@ class NoteDetailScreen extends StatelessWidget {
   Widget _titleBlock(TastingNote note) {
     final pills = [
       if (note.type != null) (Icons.local_bar_outlined, note.type!.label),
-      if (note.region.isNotEmpty) (Icons.place_outlined, note.region),
+      if (note.regionLabel.isNotEmpty) (Icons.place_outlined, note.regionLabel),
       if (note.ageCask.isNotEmpty) (Icons.hourglass_bottom, note.ageCask),
     ];
     return Row(

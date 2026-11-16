@@ -101,6 +101,7 @@ class _StyleOption extends StatelessWidget {
                           notes: sample,
                           style: style,
                           onOpen: (_) {},
+                          showFooter: false,
                         ),
                       ),
                     ),

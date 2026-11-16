@@ -36,7 +36,19 @@ class BottleShape {
     capBand: NoteColors.gold,
   );
 
-  static BottleShape of(WhiskyType? type) => switch (type) {
+  static const _square = BottleShape(
+    neck: 0.34,
+    shoulderTop: 0.36,
+    shoulderBottom: 0.40,
+    corner: 0.04,
+    capColor: Color(0xFF7A0E0E),
+  );
+
+  /// 아메리칸 위스키는 각진 병, 나머지는 종류에 따라 모양을 고릅니다.
+  static BottleShape of(WhiskyType? type, [WhiskyOrigin? origin]) =>
+      origin == WhiskyOrigin.american ? _square : _ofType(type);
+
+  static BottleShape _ofType(WhiskyType? type) => switch (type) {
     WhiskyType.singleMalt || null => _classic,
     WhiskyType.blended => const BottleShape(
       neck: 0.32,
@@ -46,14 +58,8 @@ class BottleShape {
       capColor: Color(0xFF8C1C13),
       capBand: NoteColors.gold,
     ),
-    WhiskyType.bourbon => const BottleShape(
-      neck: 0.34,
-      shoulderTop: 0.36,
-      shoulderBottom: 0.40,
-      corner: 0.04,
-      capColor: Color(0xFF7A0E0E),
-    ),
-    WhiskyType.japanese => const BottleShape(
+    WhiskyType.blendedGrain => _square,
+    WhiskyType.singleGrain => const BottleShape(
       neck: 0.26,
       shoulderTop: 0.26,
       shoulderBottom: 0.38,
@@ -61,7 +67,7 @@ class BottleShape {
       capColor: Color(0xFF111111),
       capBand: Color(0xFFBDBDBD),
     ),
-    WhiskyType.world => const BottleShape(
+    WhiskyType.blendedMalt => const BottleShape(
       neck: 0.30,
       shoulderTop: 0.28,
       shoulderBottom: 0.46,
@@ -92,7 +98,7 @@ class WhiskyBottle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shape = BottleShape.of(note.type);
+    final shape = BottleShape.of(note.type, note.origin);
     final liquid = whiskyColor(note.color ?? 0.8);
     final labelTop = height * (shape.shoulderBottom + 0.10);
     final labelHeight = height * 0.30;

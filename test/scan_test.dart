@@ -56,7 +56,8 @@ void main() {
       expect(g.name, 'SLYRS');
       expect(g.age, isNull);
       expect(g.type, WhiskyType.singleMalt);
-      expect(g.region, 'Germany / Bavaria');
+      expect(g.origin, WhiskyOrigin.world);
+      expect(g.subRegion, 'Germany');
       expect(g.words, isNot(contains('L A11089')));
       expect(g.words.where((w) => w == 'SLYRS').length, 1);
     });
@@ -65,13 +66,15 @@ void main() {
       final g = parseLabel(glenfiddich);
       expect(g.name, 'Glenfiddich 16');
       expect(g.age, 16);
-      expect(g.region, 'Scotland');
+      expect(g.origin, WhiskyOrigin.scotland);
+      expect(g.subRegion, '');
     });
 
     test('Oban: 크게 쓰인 숫자 14는 숙성 연수, 1794는 아님', () {
       final g = parseLabel(oban);
       expect(g.name, 'OBAN 14');
-      expect(g.region, 'Scotland / Highland');
+      expect(g.origin, WhiskyOrigin.scotland);
+      expect(g.subRegion, 'Highland');
     });
 
     test('글자가 없으면 빈 추측', () {
@@ -104,7 +107,11 @@ void main() {
     addTearDown(tester.view.reset);
 
     final store = NoteStore(MemoryNoteStorage());
-    final original = TastingNote(id: 'g', region: '내가 쓴 지역');
+    final original = TastingNote(
+      id: 'g',
+      origin: WhiskyOrigin.world,
+      subRegion: 'Germany',
+    );
     await tester.pumpWidget(
       MaterialApp(
         home: NoteEditScreen(
@@ -120,8 +127,8 @@ void main() {
 
     expect(find.widgetWithText(TextField, 'Glenfiddich 16'), findsOneWidget);
     expect(find.widgetWithText(TextField, '16년'), findsOneWidget);
-    // 이미 쓴 지역은 덮어쓰지 않는다.
-    expect(find.widgetWithText(TextField, '내가 쓴 지역'), findsOneWidget);
+    // 이미 고른 산지는 덮어쓰지 않는다 (라벨은 Scotland라고 해도).
+    expect(find.widgetWithText(TextField, 'Germany'), findsOneWidget);
     // 배경 제거가 안 되는 기기면 원본 사진을 쓴다고 알려준다.
     expect(find.textContaining('원본 사진'), findsWidgets);
     // 라벨 글자 칩을 누르면 이름에 덧붙는다.
@@ -134,5 +141,23 @@ void main() {
       find.widgetWithText(TextField, 'Glenfiddich 16 FORMULA ONE TEAM'),
       findsOneWidget,
     );
+  });
+
+  test('종류: 구체적인 이름(Blended Malt)을 먼저 알아본다', () {
+    WhiskyType? t(String text) =>
+        parseLabel([OcrLine(text, 10), const OcrLine('NAME', 30)]).type;
+    expect(t('BLENDED MALT SCOTCH WHISKY'), WhiskyType.blendedMalt);
+    expect(t('SINGLE GRAIN'), WhiskyType.singleGrain);
+    expect(t('BLENDED GRAIN'), WhiskyType.blendedGrain);
+    expect(t('BLENDED SCOTCH WHISKY'), WhiskyType.blended);
+  });
+
+  test('산지: 버번은 American / Bourbon', () {
+    final g = parseLabel(const [
+      OcrLine('WILD TURKEY', 40),
+      OcrLine('KENTUCKY STRAIGHT BOURBON WHISKEY', 12),
+    ]);
+    expect(g.origin, WhiskyOrigin.american);
+    expect(g.subRegion, 'Bourbon');
   });
 }

@@ -3,12 +3,13 @@
 /// 항목 구성은 손으로 쓰던 "Whiskey Tasting Note" PDF 양식을 그대로 따릅니다.
 library;
 
+/// 위스키 종류 (만드는 방식).
 enum WhiskyType {
   singleMalt('Single Malt'),
+  singleGrain('Single Grain'),
   blended('Blended'),
-  bourbon('Bourbon'),
-  japanese('Japanese'),
-  world('World');
+  blendedMalt('Blended Malt'),
+  blendedGrain('Blended Grain');
 
   const WhiskyType(this.label);
   final String label;
@@ -19,6 +20,80 @@ enum WhiskyType {
     }
     return null;
   }
+}
+
+/// 산지 (나라). 세부 지역이 정해진 나라는 [subRegions]에서 고르고,
+/// World는 나라 이름을 직접 적습니다.
+enum WhiskyOrigin {
+  scotland('Scotland', [
+    'Speyside',
+    'Highland',
+    'Lowland',
+    'Islay',
+    'Campbeltown',
+    'Islands',
+  ]),
+  american('American', [
+    'Bourbon',
+    'Rye',
+    'Tennessee',
+    'Wheat',
+    'Corn',
+    'American Single Malt',
+  ]),
+  irish('Irish'),
+  japanese('Japanese'),
+  taiwanese('Taiwanese'),
+  world('World');
+
+  const WhiskyOrigin(this.label, [this.subRegions = const []]);
+  final String label;
+  final List<String> subRegions;
+
+  /// World는 세부 지역 대신 나라 이름을 직접 적습니다.
+  bool get freeText => this == world;
+
+  static WhiskyOrigin? fromName(String? name) {
+    for (final o in values) {
+      if (o.name == name) return o;
+    }
+    return null;
+  }
+}
+
+/// 글자(라벨, 예전 지역 입력값)에서 산지와 세부 지역을 찾습니다.
+/// 대문자로 바꾼 글자를 넣어 주세요. 못 찾으면 null.
+(WhiskyOrigin, String)? originFromText(String upper) {
+  bool has(String pattern) => RegExp(pattern).hasMatch(upper);
+  const s = WhiskyOrigin.scotland, a = WhiskyOrigin.american;
+  const w = WhiskyOrigin.world;
+  final rules = <(String, WhiskyOrigin, String)>[
+    (r'ISLAY', s, 'Islay'),
+    (r'SPEYSIDE', s, 'Speyside'),
+    (r'CAMPBELTOWN', s, 'Campbeltown'),
+    (r'LOWLAND', s, 'Lowland'),
+    (r'HIGHLAND', s, 'Highland'),
+    (r'\bISLANDS?\b|ISLE OF', s, 'Islands'),
+    (r'SCOTCH|SCOTLAND', s, ''),
+    (r'TENNESSEE', a, 'Tennessee'),
+    (r'BOURBON', a, 'Bourbon'),
+    (r'\bRYE\b', a, 'Rye'),
+    (r'KENTUCKY|AMERICAN|\bUSA\b|AMERICA', a, ''),
+    (r'IRISH|IRELAND', WhiskyOrigin.irish, ''),
+    (r'JAPAN', WhiskyOrigin.japanese, ''),
+    (r'TAIWAN|KAVALAN', WhiskyOrigin.taiwanese, ''),
+    (r'BAVARIA|GERMAN', w, 'Germany'),
+    (r'INDIA', w, 'India'),
+    (r'AUSTRALIA', w, 'Australia'),
+    (r'CANADA|CANADIAN', w, 'Canada'),
+    (r'WALES|WELSH', w, 'Wales'),
+    (r'FRANCE|FRENCH', w, 'France'),
+    (r'SWEDEN|SWEDISH', w, 'Sweden'),
+  ];
+  for (final (pattern, origin, sub) in rules) {
+    if (has(pattern)) return (origin, sub);
+  }
+  return null;
 }
 
 /// 레이더 차트의 축 하나 (예: 곡물). [examples]는 (?) 버튼을 누르면 보이는 예시입니다.
@@ -84,7 +159,8 @@ class TastingNote {
     required this.id,
     this.name = '',
     this.type,
-    this.region = '',
+    this.origin,
+    this.subRegion = '',
     this.ageCask = '',
     this.abv,
     this.price = '',
@@ -117,8 +193,17 @@ class TastingNote {
   String name;
   WhiskyType? type;
 
-  /// 국가 / 지역
-  String region;
+  /// 산지 (나라)
+  WhiskyOrigin? origin;
+
+  /// 세부 지역 (예: Islay, Bourbon) 또는 World일 때 나라 이름
+  String subRegion;
+
+  /// 화면에 보여줄 산지 (예: "Scotland · Islay")
+  String get regionLabel => [
+    if (origin != null) origin!.label,
+    if (subRegion.isNotEmpty) subRegion,
+  ].join(' · ');
 
   /// 숙성연도 / 캐스크
   String ageCask;
@@ -168,7 +253,8 @@ class TastingNote {
     'id': id,
     'name': name,
     'type': type?.name,
-    'region': region,
+    'origin': origin?.name,
+    'subRegion': subRegion,
     'ageCask': ageCask,
     'abv': abv,
     'price': price,
@@ -186,29 +272,55 @@ class TastingNote {
     'updatedAt': updatedAt.toIso8601String(),
   };
 
-  factory TastingNote.fromJson(Map<String, dynamic> j) => TastingNote(
-    id: j['id'] as String,
-    name: j['name'] as String? ?? '',
-    type: WhiskyType.fromName(j['type'] as String?),
-    region: j['region'] as String? ?? '',
-    ageCask: j['ageCask'] as String? ?? '',
-    abv: (j['abv'] as num?)?.toDouble(),
-    price: j['price'] as String? ?? '',
-    score: (j['score'] as num?)?.toDouble(),
-    color: (j['color'] as num?)?.toDouble(),
-    photo: j['photo'] as String?,
-    cutout: j['cutout'] as String?,
-    nose: _intList(j['nose']),
-    palate: _intList(j['palate']),
-    retronasal: _intList(j['retronasal']),
-    characters: (j['characters'] as Map?)?.map(
-      (k, v) => MapEntry(k as String, (v as num).toInt()),
-    ),
-    finish: (j['finish'] as num?)?.toInt() ?? scaleDefault,
-    overall: j['overall'] as String? ?? '',
-    createdAt: DateTime.tryParse(j['createdAt'] as String? ?? ''),
-    updatedAt: DateTime.tryParse(j['updatedAt'] as String? ?? ''),
-  );
+  factory TastingNote.fromJson(Map<String, dynamic> j) {
+    // 예전 형식 바꾸기: 종류에 있던 Bourbon/Japanese/World와
+    // 자유 입력 지역("Scotland / Islay")을 산지 + 세부 지역으로 옮깁니다.
+    final rawType = j['type'] as String?;
+    var origin = WhiskyOrigin.fromName(j['origin'] as String?);
+    var sub = j['subRegion'] as String? ?? '';
+    final legacyRegion = (j['region'] as String? ?? '').trim();
+    if (origin == null && !j.containsKey('origin')) {
+      final fromType = switch (rawType) {
+        'bourbon' => (WhiskyOrigin.american, 'Bourbon'),
+        'japanese' => (WhiskyOrigin.japanese, ''),
+        'world' => (WhiskyOrigin.world, ''),
+        _ => null,
+      };
+      final fromRegion = legacyRegion.isEmpty
+          ? null
+          : originFromText(legacyRegion.toUpperCase()) ??
+                (WhiskyOrigin.world, legacyRegion);
+      final picked = fromRegion ?? fromType;
+      if (picked != null) {
+        origin = picked.$1;
+        sub = picked.$2.isNotEmpty ? picked.$2 : (fromType?.$2 ?? '');
+      }
+    }
+    return TastingNote(
+      id: j['id'] as String,
+      name: j['name'] as String? ?? '',
+      type: WhiskyType.fromName(rawType),
+      origin: origin,
+      subRegion: sub,
+      ageCask: j['ageCask'] as String? ?? '',
+      abv: (j['abv'] as num?)?.toDouble(),
+      price: j['price'] as String? ?? '',
+      score: (j['score'] as num?)?.toDouble(),
+      color: (j['color'] as num?)?.toDouble(),
+      photo: j['photo'] as String?,
+      cutout: j['cutout'] as String?,
+      nose: _intList(j['nose']),
+      palate: _intList(j['palate']),
+      retronasal: _intList(j['retronasal']),
+      characters: (j['characters'] as Map?)?.map(
+        (k, v) => MapEntry(k as String, (v as num).toInt()),
+      ),
+      finish: (j['finish'] as num?)?.toInt() ?? scaleDefault,
+      overall: j['overall'] as String? ?? '',
+      createdAt: DateTime.tryParse(j['createdAt'] as String? ?? ''),
+      updatedAt: DateTime.tryParse(j['updatedAt'] as String? ?? ''),
+    );
+  }
 
   static List<int>? _intList(Object? v) =>
       (v as List?)?.map((e) => (e as num).toInt()).toList();

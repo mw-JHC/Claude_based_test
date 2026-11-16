@@ -7,6 +7,7 @@ import 'package:whisky_note/data/note_store.dart';
 import 'package:whisky_note/main.dart';
 import 'package:whisky_note/models/tasting_note.dart';
 import 'package:whisky_note/screens/note_detail_screen.dart';
+import 'package:whisky_note/widgets/cabinet_view.dart';
 import 'package:whisky_note/widgets/flavor_wheel.dart';
 import 'package:whisky_note/widgets/whisky_bottle.dart';
 
@@ -16,7 +17,8 @@ void main() {
       id: '1',
       name: 'Lagavulin 16',
       type: WhiskyType.singleMalt,
-      region: 'Scotland / Islay',
+      origin: WhiskyOrigin.scotland,
+      subRegion: 'Islay',
       abv: 43,
       score: 92,
       color: 1.3,
@@ -131,5 +133,56 @@ void main() {
     expect(find.byIcon(Icons.help_outline), findsNothing);
     expect(find.text('3'), findsOneWidget);
     expect(find.text('7'), findsOneWidget);
+  });
+
+  test('예전 형식(종류 Bourbon, 자유 입력 지역)을 산지로 옮긴다', () {
+    TastingNote old(Map<String, dynamic> extra) =>
+        TastingNote.fromJson({'id': 'x', 'name': 'n', ...extra});
+
+    final bourbon = old({'type': 'bourbon', 'region': 'USA / Kentucky'});
+    expect(bourbon.type, isNull);
+    expect(bourbon.origin, WhiskyOrigin.american);
+    expect(bourbon.subRegion, 'Bourbon');
+
+    final islay = old({'type': 'singleMalt', 'region': 'Scotland / Islay'});
+    expect(islay.type, WhiskyType.singleMalt);
+    expect(islay.regionLabel, 'Scotland · Islay');
+
+    final japan = old({'type': 'japanese', 'region': ''});
+    expect(japan.origin, WhiskyOrigin.japanese);
+
+    final other = old({'type': 'world', 'region': 'Germany / Bavaria'});
+    expect(other.origin, WhiskyOrigin.world);
+    expect(other.subRegion, 'Germany');
+
+    final free = old({'region': '스웨덴 어딘가'});
+    expect(free.origin, WhiskyOrigin.world);
+    expect(free.subRegion, '스웨덴 어딘가');
+
+    // 새 형식으로 저장한 것은 그대로 읽는다.
+    final again = TastingNote.fromJson(islay.toJson());
+    expect(again.regionLabel, 'Scotland · Islay');
+  });
+
+  testWidgets('병이 많으면 진열장이 여러 칸으로 나뉘고 옆으로 넘긴다', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.5;
+    addTearDown(tester.view.reset);
+    final store = NoteStore(MemoryNoteStorage());
+    final notes = [
+      for (var i = 0; i < 30; i++) TastingNote(id: '$i', name: 'Bottle $i'),
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CabinetView(store: store, notes: notes, onOpen: (_) {}),
+        ),
+      ),
+    );
+    expect(find.textContaining('1/'), findsOneWidget);
+    expect(find.text('Bottle 0'), findsWidgets);
+    await tester.fling(find.byType(PageView), const Offset(-300, 0), 1500);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('2/'), findsOneWidget);
   });
 }

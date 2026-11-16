@@ -13,6 +13,7 @@ import '../widgets/character_slider.dart';
 import '../widgets/color_scale.dart';
 import '../widgets/flavor_wheel.dart';
 import '../widgets/note_photo.dart';
+import '../widgets/origin_picker.dart';
 import '../widgets/sheet_section.dart';
 import 'bottle_camera_screen.dart';
 
@@ -40,7 +41,6 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
       widget.original?.copy() ?? TastingNote.create();
 
   late final _name = TextEditingController(text: _note.name);
-  late final _region = TextEditingController(text: _note.region);
   late final _ageCask = TextEditingController(text: _note.ageCask);
   late final _abv = TextEditingController(text: _fmt(_note.abv));
   late final _price = TextEditingController(text: _note.price);
@@ -72,15 +72,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
 
   @override
   void dispose() {
-    for (final c in [
-      _name,
-      _region,
-      _ageCask,
-      _abv,
-      _price,
-      _score,
-      _overall,
-    ]) {
+    for (final c in [_name, _ageCask, _abv, _price, _score, _overall]) {
       c.dispose();
     }
     super.dispose();
@@ -149,9 +141,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
       _ageCask.text = '${g.age}년';
       filled.add('숙성 ${g.age}년');
     }
-    if (_region.text.trim().isEmpty && g.region != null) {
-      _region.text = g.region!;
-      filled.add('지역');
+    if (_note.origin == null && g.origin != null) {
+      _note
+        ..origin = g.origin
+        ..subRegion = g.subRegion;
+      filled.add('산지');
     }
     if (_note.type == null && g.type != null) {
       _note.type = g.type;
@@ -183,7 +177,6 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     setState(() => _saving = true);
     _note
       ..name = _name.text.trim()
-      ..region = _region.text.trim()
       ..ageCask = _ageCask.text.trim()
       ..abv = _parse(_abv.text)
       ..price = _price.text.trim()
@@ -374,24 +367,37 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          field(_name, '이름 / Name *'),
+          if (_labelWords.isNotEmpty) _labelWordChips(),
+          const Text(
+            '종류',
+            style: TextStyle(fontSize: 12, color: NoteColors.hint),
+          ),
+          const SizedBox(height: 6),
           Wrap(
             spacing: 6,
-            runSpacing: 4,
+            runSpacing: 6,
             children: [
               for (final t in WhiskyType.values)
-                ChoiceChip(
-                  label: Text(t.label),
+                SelectPill(
+                  label: t.label,
                   selected: _note.type == t,
-                  showCheckmark: false,
-                  onSelected: (on) =>
-                      setState(() => _note.type = on ? t : null),
+                  onTap: () =>
+                      setState(() => _note.type = _note.type == t ? null : t),
                 ),
             ],
           ),
-          const SizedBox(height: 12),
-          field(_name, '이름 / Name *'),
-          if (_labelWords.isNotEmpty) _labelWordChips(),
-          field(_region, '국가 / 지역'),
+          const SizedBox(height: 16),
+          OriginPicker(
+            origin: _note.origin,
+            subRegion: _note.subRegion,
+            onChanged: (o, sub) => setState(() {
+              _note
+                ..origin = o
+                ..subRegion = sub;
+            }),
+          ),
+          const SizedBox(height: 16),
           field(_ageCask, '숙성연도 / 캐스크'),
           Row(
             children: [

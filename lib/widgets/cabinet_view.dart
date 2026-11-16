@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
-import 'package:flutter/physics.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../data/app_settings.dart';
@@ -12,8 +11,9 @@ import 'whisky_bottle.dart';
 
 /// 위스키를 진열장에 세워서 보여주는 화면. [style]에 따라 분위기가 바뀝니다.
 ///
-/// 좌우로 끌면 진열장이 원근감 있게 살짝 돌아가고, 손을 떼면
-/// 스프링처럼 제자리로 돌아옵니다. 병을 누르면 [onOpen]이 불립니다.
+/// 진열장 한 칸(페이지)은 화면 높이에 맞는 만큼의 선반을 갖고, 병이 더 많으면
+/// 옆으로 넘겨 다음 진열장을 봅니다. 넘길 때 진열장이 입체적으로 돌아갑니다.
+/// 병을 누르면 [onOpen]이 불립니다.
 class CabinetView extends StatefulWidget {
   const CabinetView({
     super.key,
@@ -21,6 +21,8 @@ class CabinetView extends StatefulWidget {
     required this.notes,
     required this.onOpen,
     this.style = CabinetStyle.woodShop,
+    this.onPickStyle,
+    this.showFooter = true,
     this.emptyMessage,
   });
 
@@ -29,6 +31,12 @@ class CabinetView extends StatefulWidget {
   final void Function(TastingNote note) onOpen;
   final CabinetStyle style;
 
+  /// 아래쪽 진열장 이름을 누르면 불립니다 (분위기 바꾸기).
+  final VoidCallback? onPickStyle;
+
+  /// 아래쪽 줄 (진열장 이름, 페이지 표시). 설정 미리보기에서는 숨깁니다.
+  final bool showFooter;
+
   /// 진열할 병이 없을 때 진열장 위에 띄울 안내.
   final Widget? emptyMessage;
 
@@ -36,47 +44,50 @@ class CabinetView extends StatefulWidget {
   State<CabinetView> createState() => _CabinetViewState();
 }
 
-class _CabinetViewState extends State<CabinetView>
-    with SingleTickerProviderStateMixin {
-  static const _maxTilt = 0.32;
+/// 진열장 한 칸의 크기 계산 결과.
+class _Layout {
+  const _Layout(this.perRow, this.rows);
+  final int perRow;
+  final int rows;
+  int get capacity => perRow * rows;
+}
 
-  late final AnimationController _tilt = AnimationController.unbounded(
-    vsync: this,
-  )..addListener(() => setState(() {}));
+class _CabinetViewState extends State<CabinetView> {
+  static const _footerHeight = 58.0;
+
+  final _pages = PageController();
+  int _page = 0;
 
   @override
   void dispose() {
-    _tilt.dispose();
+    _pages.dispose();
     super.dispose();
   }
 
-  void _drag(DragUpdateDetails d) {
-    _tilt.stop();
-    _tilt.value = (_tilt.value + d.delta.dx * 0.004).clamp(-_maxTilt, _maxTilt);
-  }
-
-  void _release(DragEndDetails d) {
-    _tilt.animateWith(
-      SpringSimulation(
-        const SpringDescription(mass: 1, stiffness: 140, damping: 9),
-        _tilt.value,
-        0,
-        (d.primaryVelocity ?? 0) * 0.004,
+  /// 화면 크기에 맞춰 한 진열장에 들어갈 줄 수와 한 줄의 병 수를 정합니다.
+  _Layout _layout(Size size) {
+    final (perRow, overhead, minShelf) = switch (widget.style) {
+      CabinetStyle.woodShop => (
+        math.max(2, ((size.width - 72) / 84).floor()),
+        40.0,
+        205.0,
       ),
-    );
+      CabinetStyle.backBar => (
+        math.max(2, ((size.width - 60) / 84).floor()),
+        34.0,
+        222.0,
+      ),
+      CabinetStyle.museum => (2, 24.0, 300.0),
+    };
+    final rows = math.max(1, ((size.height - overhead) / minShelf).floor());
+    return _Layout(perRow, rows);
   }
 
-  /// 한 줄에 [perRow]병씩 나눈 줄 목록. 빈 진열장도 보기 좋게 최소 [minRows]줄.
-  List<List<TastingNote>> _rows(int perRow, int minRows) {
-    final notes = widget.notes;
-    final count = math.max(minRows, (notes.length / perRow).ceil());
-    return [
-      for (var r = 0; r < count; r++)
-        notes.sublist(
-          math.min(r * perRow, notes.length),
-          math.min((r + 1) * perRow, notes.length),
-        ),
-    ];
+  double get _pagePosition {
+    if (_pages.hasClients && _pages.position.hasContentDimensions) {
+      return _pages.page ?? _page.toDouble();
+    }
+    return _page.toDouble();
   }
 
   Widget _bottle(TastingNote note, double height, {double reflection = 0}) =>
@@ -96,40 +107,135 @@ class _CabinetViewState extends State<CabinetView>
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, box) {
-        final tilt = _tilt.value;
-        final cabinet = switch (widget.style) {
-          CabinetStyle.woodShop => _woodShop(box.maxWidth, tilt),
-          CabinetStyle.backBar => _backBar(box.maxWidth, tilt),
-          CabinetStyle.museum => _museum(box.maxWidth, tilt),
-        };
-        return GestureDetector(
-          onHorizontalDragUpdate: _drag,
-          onHorizontalDragEnd: _release,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Transform(
-                  alignment: Alignment.center,
+        final footer = widget.showFooter ? _footerHeight : 0.0;
+        final size = Size(box.maxWidth, box.maxHeight - footer);
+        final layout = _layout(size);
+        final notes = widget.notes;
+        final pageCount = math.max(1, (notes.length / layout.capacity).ceil());
+        if (_page >= pageCount) {
+          // 필터나 삭제로 병이 줄어 마지막 진열장이 사라졌을 때.
+          _page = pageCount - 1;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_pages.hasClients) _pages.jumpToPage(_page);
+          });
+        }
+
+        final pages = PageView.builder(
+          controller: _pages,
+          itemCount: pageCount,
+          // 한 칸뿐이어도 끌면 살짝 돌아갔다가 돌아옵니다.
+          physics: const BouncingScrollPhysics(),
+          onPageChanged: (i) => setState(() => _page = i),
+          itemBuilder: (context, i) {
+            final start = i * layout.capacity;
+            final slice = notes.sublist(
+              math.min(start, notes.length),
+              math.min(start + layout.capacity, notes.length),
+            );
+            return AnimatedBuilder(
+              animation: _pages,
+              builder: (context, _) {
+                // 0이면 정면, ±1이면 옆으로 완전히 돌아간 진열장.
+                final delta = (i - _pagePosition).clamp(-1.0, 1.0);
+                return Transform(
+                  alignment: delta > 0
+                      ? Alignment.centerLeft
+                      : Alignment.centerRight,
                   transform: Matrix4.identity()
-                    ..setEntry(3, 2, 0.0014)
-                    ..rotateY(tilt),
-                  child: cabinet,
-                ),
+                    ..setEntry(3, 2, 0.0012)
+                    ..rotateY(delta * 0.85),
+                  child: _cabinet(layout, slice, delta * 0.35),
+                );
+              },
+            );
+          },
+        );
+
+        return Column(
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned.fill(child: pages),
+                  if (notes.isEmpty && widget.emptyMessage != null)
+                    Center(child: widget.emptyMessage),
+                ],
               ),
-              if (widget.notes.isEmpty && widget.emptyMessage != null)
-                Center(child: widget.emptyMessage),
-            ],
-          ),
+            ),
+            if (widget.showFooter) _footer(pageCount),
+          ],
         );
       },
     );
   }
 
+  Widget _footer(int pageCount) {
+    return SizedBox(
+      height: _footerHeight,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 8, right: 180),
+        child: Row(
+          children: [
+            Flexible(
+              child: TextButton.icon(
+                onPressed: widget.onPickStyle,
+                icon: const Icon(Icons.swap_horiz, size: 18),
+                label: Text(
+                  widget.style.shortLabel,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: NoteColors.hint,
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            if (pageCount > 1) ...[
+              const SizedBox(width: 4),
+              for (var i = 0; i < pageCount && i < 8; i++)
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: i == _page ? 16 : 6,
+                  height: 6,
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    color: i == _page ? NoteColors.amber : NoteColors.line,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              const SizedBox(width: 6),
+              Text(
+                '${_page + 1}/$pageCount',
+                style: const TextStyle(fontSize: 12, color: NoteColors.hint),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _cabinet(_Layout layout, List<TastingNote> notes, double tilt) {
+    final rows = [
+      for (var r = 0; r < layout.rows; r++)
+        notes.sublist(
+          math.min(r * layout.perRow, notes.length),
+          math.min((r + 1) * layout.perRow, notes.length),
+        ),
+    ];
+    return switch (widget.style) {
+      CabinetStyle.woodShop => _woodShop(layout.perRow, rows, tilt),
+      CabinetStyle.backBar => _backBar(layout.perRow, rows, tilt),
+      CabinetStyle.museum => _museum(rows, tilt),
+    };
+  }
+
   // ───────────────────────── 고급 위스키숍 원목장 ─────────────────────────
 
-  Widget _woodShop(double width, double tilt) {
-    final perRow = math.max(2, ((width - 72) / 84).floor());
-    final rows = _rows(perRow, 3);
+  Widget _woodShop(int perRow, List<List<TastingNote>> rows, double tilt) {
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
       decoration: BoxDecoration(
@@ -138,7 +244,7 @@ class _CabinetViewState extends State<CabinetView>
           end: Alignment.bottomRight,
           colors: [Color(0xFF5A3420), Color(0xFF3A2013), Color(0xFF4E2C1A)],
         ),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFF24140B), width: 2),
         boxShadow: const [
           BoxShadow(
@@ -148,20 +254,24 @@ class _CabinetViewState extends State<CabinetView>
           ),
         ],
       ),
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      padding: const EdgeInsets.all(12),
       child: Container(
         decoration: BoxDecoration(
           border: Border.all(color: NoteColors.gold.withValues(alpha: 0.6)),
         ),
-        child: ListView.builder(
-          padding: const EdgeInsets.only(bottom: 96),
-          itemCount: rows.length,
-          itemBuilder: (_, r) => _WoodShelf(
-            slots: perRow,
-            tilt: tilt,
-            notes: rows[r],
-            bottle: (n) => _bottle(n, 150),
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final row in rows)
+              Expanded(
+                child: _WoodShelf(
+                  slots: perRow,
+                  tilt: tilt,
+                  notes: row,
+                  bottle: (n) => _bottle(n, 150),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -169,9 +279,7 @@ class _CabinetViewState extends State<CabinetView>
 
   // ───────────────────────── 바 뒤편 진열장 ─────────────────────────
 
-  Widget _backBar(double width, double tilt) {
-    final perRow = math.max(2, ((width - 60) / 84).floor());
-    final rows = _rows(perRow, 3);
+  Widget _backBar(int perRow, List<List<TastingNote>> rows, double tilt) {
     return Container(
       margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
       decoration: BoxDecoration(
@@ -182,7 +290,7 @@ class _CabinetViewState extends State<CabinetView>
           colors: [Color(0xFF2B1810), Color(0xFF1A0E08)],
         ),
         border: Border.all(color: const Color(0xFF8C7A5B), width: 1.5),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+        borderRadius: BorderRadius.circular(6),
         boxShadow: const [
           BoxShadow(
             color: Colors.black87,
@@ -191,24 +299,28 @@ class _CabinetViewState extends State<CabinetView>
           ),
         ],
       ),
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+      padding: const EdgeInsets.all(10),
       child: ClipRect(
-        child: ListView.builder(
-          padding: const EdgeInsets.only(bottom: 96),
-          itemCount: rows.length,
-          itemBuilder: (_, r) => _BarShelf(
-            slots: perRow,
-            tilt: tilt,
-            notes: rows[r],
-            bottle: (n, mirror) => mirror
-                ? BottleFigure(
-                    note: n,
-                    cutout: widget.store.storage.image(n.cutout),
-                    photo: widget.store.storage.image(n.photo),
-                    height: 150,
-                  )
-                : _bottle(n, 150, reflection: 16),
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final row in rows)
+              Expanded(
+                child: _BarShelf(
+                  slots: perRow,
+                  tilt: tilt,
+                  notes: row,
+                  bottle: (n, mirror) => mirror
+                      ? BottleFigure(
+                          note: n,
+                          cutout: widget.store.storage.image(n.cutout),
+                          photo: widget.store.storage.image(n.photo),
+                          height: 150,
+                        )
+                      : _bottle(n, 150, reflection: 16),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -216,9 +328,7 @@ class _CabinetViewState extends State<CabinetView>
 
   // ───────────────────────── 박물관 유리 케이스 ─────────────────────────
 
-  Widget _museum(double width, double tilt) {
-    const perRow = 2;
-    final rows = _rows(perRow, 2);
+  Widget _museum(List<List<TastingNote>> rows, double tilt) {
     return DecoratedBox(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -227,17 +337,25 @@ class _CabinetViewState extends State<CabinetView>
           colors: [Color(0xFF0B0B0D), Color(0xFF16151A), Color(0xFF0E0D10)],
         ),
       ),
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(8, 12, 8, 96),
-        itemCount: rows.length,
-        itemBuilder: (_, r) => Row(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (var i = 0; i < perRow; i++)
+            for (final row in rows)
               Expanded(
-                child: _MuseumCase(
-                  note: i < rows[r].length ? rows[r][i] : null,
-                  tilt: tilt,
-                  bottle: (n) => _bottle(n, 180, reflection: 14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < 2; i++)
+                      Expanded(
+                        child: _MuseumCase(
+                          note: i < row.length ? row[i] : null,
+                          tilt: tilt,
+                          bottle: (n) => _bottle(n, 180, reflection: 14),
+                        ),
+                      ),
+                  ],
                 ),
               ),
           ],
@@ -257,7 +375,6 @@ class _WoodShelf extends StatelessWidget {
     required this.bottle,
   });
 
-  static const height = 220.0;
   static const board = 40.0;
 
   final int slots;
@@ -269,8 +386,7 @@ class _WoodShelf extends StatelessWidget {
   Widget build(BuildContext context) {
     // 기울일 때 병이 뒤판보다 더 많이 움직여서 깊이감이 생깁니다.
     final parallax = tilt * 28;
-    return SizedBox(
-      height: height,
+    return SizedBox.expand(
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -521,7 +637,6 @@ class _BarShelf extends StatelessWidget {
     required this.bottle,
   });
 
-  static const height = 236.0;
   static const glass = 30.0;
 
   final int slots;
@@ -534,8 +649,7 @@ class _BarShelf extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final parallax = tilt * 30;
-    return SizedBox(
-      height: height,
+    return SizedBox.expand(
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -751,8 +865,7 @@ class _MuseumCase extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final n = note;
-    return SizedBox(
-      height: 330,
+    return SizedBox.expand(
       child: Column(
         children: [
           Expanded(
@@ -939,7 +1052,7 @@ class _Plaque extends StatelessWidget {
   Widget build(BuildContext context) {
     final sub = [
       note.type?.label,
-      if (note.region.isNotEmpty) note.region,
+      if (note.regionLabel.isNotEmpty) note.regionLabel,
     ].whereType<String>().join(' · ');
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14),

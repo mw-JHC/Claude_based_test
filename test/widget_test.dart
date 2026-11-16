@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:whisky_note/data/app_settings.dart';
 import 'package:whisky_note/data/note_store.dart';
 import 'package:whisky_note/main.dart';
 import 'package:whisky_note/models/tasting_note.dart';
@@ -39,8 +41,10 @@ void main() {
     tester.view.devicePixelRatio = 2.5;
     addTearDown(tester.view.reset);
 
+    SharedPreferences.setMockInitialValues({});
+    final settings = await AppSettings.load();
     final store = NoteStore(MemoryNoteStorage());
-    await tester.pumpWidget(WhiskyNoteApp(store: store));
+    await tester.pumpWidget(WhiskyNoteApp(store: store, settings: settings));
     await store.load();
     await tester.pump();
     expect(find.text('아직 기록한 위스키가 없습니다'), findsOneWidget);
@@ -69,6 +73,23 @@ void main() {
     await tester.tap(find.byTooltip('목록으로 보기'));
     await tester.pumpAndSettle();
     expect(find.text('Single Malt'), findsOneWidget);
+    await tester.tap(find.byTooltip('진열장으로 보기'));
+    await tester.pumpAndSettle();
+
+    // 설정에서 진열장 분위기를 바꾸면 저장되고 바로 반영된다.
+    await tester.tap(find.byTooltip('설정'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('박물관 유리 케이스'));
+    await tester.pumpAndSettle();
+    expect(settings.cabinetStyle, CabinetStyle.museum);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('cabinetStyle'), 'museum');
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    // 박물관 케이스는 받침대에 비친 반사까지 그려서 병이 두 번 나온다 (첫 번째가 실제 병).
+    await tester.tap(find.byType(WhiskyBottle).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Whiskey Tasting Note'), findsOneWidget);
   });
 
   testWidgets('(?)를 누르면 예시가 나오고 값은 바뀌지 않는다', (tester) async {

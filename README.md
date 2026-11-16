@@ -4,10 +4,12 @@
 
 ## 기능 (v0.1)
 
-- **진열장 보기**: 마셔본 위스키를 나무 진열장 선반에 병 모양으로 세워서 보여줍니다.
-  - 병 안의 위스키 색은 노트의 색상 값, 병 모양과 뚜껑은 종류(Single Malt, Bourbon 등)에 따라 달라집니다.
-  - 라벨에는 사진이 있으면 사진, 없으면 이름이 들어가고, 선반의 황동 이름표에 이름과 점수가 표시됩니다.
+- **진열장 보기**: 마셔본 위스키를 진열장에 세워서 보여줍니다.
+  - **병 사진을 찍으면 배경을 지우고 병만 오려서** 진열장에 세웁니다 (구글 ML Kit, 폰 안에서 처리). 사진이 없는 병은 그린 병으로 보입니다.
+  - 진열장 분위기는 **설정(⚙)** 에서 고릅니다: 고급 위스키숍 원목장 / 바 뒤편 진열장(거울, 유리 선반, LED) / 박물관 유리 케이스(받침대, 스포트라이트).
   - 진열장을 좌우로 끌면 입체적으로 살짝 돌아갔다가 제자리로 돌아옵니다. 병을 누르면 노트가 열립니다.
+- **병 촬영**: 카메라 화면에 병 모양 가이드 틀이 떠서 정면으로 찍도록 도와줍니다.
+  찍고 나면 라벨 글자를 읽어 **이름, 숙성 연수, 종류, 지역**의 빈 칸을 채웁니다 (예: "Glenfiddich 16"). 라벨에서 읽은 다른 글자는 눌러서 이름에 덧붙일 수 있습니다.
 - **목록 보기**: 오른쪽 위 버튼으로 진열장과 목록을 바꿀 수 있습니다. 이름, 지역, 종류로 검색합니다.
 - **노트 작성/수정**: PDF 양식의 모든 항목을 입력합니다.
   - 종류 (Single Malt / Blended / Bourbon / Japanese / World)
@@ -33,8 +35,14 @@ lib/
   theme.dart                    PDF 색감 (짙은 갈색, 금색, 크림색)
   models/tasting_note.dart      노트 데이터와 항목 정의 (축 이름, 개성 막대 등)
   data/note_store.dart          저장/불러오기 (JSON 파일 + 사진 폴더)
+  services/
+    bottle_scanner.dart         병 오려내기, 라벨 글자 읽기 (ML Kit)
+    label_parser.dart           라벨 글자 → 이름 / 숙성 연수 / 종류 / 지역 추측
+  data/app_settings.dart        설정 (진열장 분위기) 저장
   screens/
-    note_list_screen.dart       목록 화면
+    note_list_screen.dart       첫 화면 (진열장 / 목록)
+    bottle_camera_screen.dart   병 모양 가이드 틀이 있는 카메라
+    settings_screen.dart        설정 화면
     note_edit_screen.dart       작성/수정 화면
     note_detail_screen.dart     보기 화면
   widgets/
@@ -46,7 +54,8 @@ lib/
     character_slider.dart       개성 막대
     sheet_section.dart          PDF 스타일 제목 막대가 달린 칸
     note_photo.dart             사진 표시
-test/widget_test.dart           저장 형식과 노트 작성 흐름 테스트
+test/widget_test.dart           저장 형식, 노트 작성, 진열장 설정 테스트
+test/scan_test.dart             라벨 읽기, 병 고르기, 사진으로 빈 칸 채우기 테스트
 ```
 
 축 이름이나 (?) 예시를 바꾸고 싶으면 `lib/models/tasting_note.dart`의 `aromaAxes`, `palateAxes`, `characterScales`만 고치면 됩니다.
@@ -103,6 +112,13 @@ VS Code에서는 폴더를 열고 오른쪽 아래에서 연결된 폰을 고른
 ```bash
 flutter test
 ```
+
+## 배경 제거와 글자 인식에 대해
+
+- 둘 다 구글 ML Kit을 써서 **폰 안에서** 처리합니다. 사진이 인터넷으로 나가지 않습니다.
+- 배경 제거 모델은 Google Play 서비스가 처음 한 번 내려받습니다. 에뮬레이터라면 **Google Play가 들어간 시스템 이미지**여야 하고, 처음에는 인터넷 연결이 필요합니다.
+- 배경 제거는 현재 **안드로이드에서만** 됩니다. iOS에서는 원본 사진을 쓰고, 글자 인식은 iOS에서도 됩니다.
+- 단색 배경 앞에서 병을 정면으로 찍으면 가장 잘 오려집니다. 결과가 마음에 안 들면 노트 화면에서 "원본 사진"을 고르면 됩니다.
 
 ## 나중에 iOS에서 실행하기
 

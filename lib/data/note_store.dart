@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:material_ui/material_ui.dart' show FileImage, ImageProvider;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/tasting_note.dart';
@@ -13,8 +14,13 @@ abstract class NoteStorage {
 
   /// 고른 사진을 앱 저장소로 복사하고, 저장된 파일 이름을 돌려줍니다.
   Future<String> importPhoto(String sourcePath, String noteId);
+
+  /// 병만 오려낸 PNG 같은 메모리 속 이미지를 저장하고, 파일 이름을 돌려줍니다.
+  Future<String> importBytes(Uint8List bytes, String noteId, String ext);
   Future<void> deletePhoto(String name);
-  File? photoFile(String? name);
+
+  /// 저장된 사진을 화면에 그릴 수 있는 형태로 돌려줍니다.
+  ImageProvider? image(String? name);
 }
 
 /// 폰의 앱 전용 폴더에 JSON 파일과 사진을 저장합니다.
@@ -63,14 +69,22 @@ class FileNoteStorage implements NoteStorage {
   }
 
   @override
+  Future<String> importBytes(Uint8List bytes, String noteId, String ext) async {
+    await _photoDir.create(recursive: true);
+    final name = '${noteId}_${DateTime.now().millisecondsSinceEpoch}$ext';
+    await File('${_photoDir.path}/$name').writeAsBytes(bytes, flush: true);
+    return name;
+  }
+
+  @override
   Future<void> deletePhoto(String name) async {
     final f = File('${_photoDir.path}/$name');
     if (await f.exists()) await f.delete();
   }
 
   @override
-  File? photoFile(String? name) =>
-      name == null ? null : File('${_photoDir.path}/$name');
+  ImageProvider? image(String? name) =>
+      name == null ? null : FileImage(File('${_photoDir.path}/$name'));
 }
 
 /// 테스트용: 메모리에만 저장합니다.
@@ -93,10 +107,17 @@ class MemoryNoteStorage implements NoteStorage {
       sourcePath;
 
   @override
+  Future<String> importBytes(
+    Uint8List bytes,
+    String noteId,
+    String ext,
+  ) async => '$noteId$ext';
+
+  @override
   Future<void> deletePhoto(String name) async {}
 
   @override
-  File? photoFile(String? name) => null;
+  ImageProvider? image(String? name) => null;
 }
 
 /// 앱 전체에서 공유하는 노트 목록.
@@ -138,8 +159,12 @@ class NoteStore extends ChangeNotifier {
       _notes.add(note);
     }
     await storage.saveAll(_notes);
-    if (old?.photo != null && old!.photo != note.photo) {
-      await storage.deletePhoto(old.photo!);
+    // 바뀐 사진은 지웁니다.
+    for (final (before, after) in [
+      (old?.photo, note.photo),
+      (old?.cutout, note.cutout),
+    ]) {
+      if (before != null && before != after) await storage.deletePhoto(before);
     }
     notifyListeners();
   }
@@ -149,7 +174,9 @@ class NoteStore extends ChangeNotifier {
     if (note == null) return;
     _notes.remove(note);
     await storage.saveAll(_notes);
-    if (note.photo != null) await storage.deletePhoto(note.photo!);
+    for (final name in [note.photo, note.cutout]) {
+      if (name != null) await storage.deletePhoto(name);
+    }
     notifyListeners();
   }
 }

@@ -139,7 +139,8 @@ class NoteDetailScreen extends StatelessWidget {
   }
 
   Widget _header(TastingNote note) {
-    final photo = store.storage.photoFile(note.photo);
+    final cutout = store.storage.image(note.cutout);
+    final photo = cutout ?? store.storage.image(note.photo);
     String? num(double? v, String unit) =>
         v == null ? null : '${v == v.roundToDouble() ? v.toInt() : v}$unit';
     final rows = <(String, String?)>[
@@ -158,7 +159,10 @@ class NoteDetailScreen extends StatelessWidget {
           if (photo != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: SizedBox(height: 260, child: NotePhoto(file: photo)),
+              child: SizedBox(
+                height: 300,
+                child: NotePhoto(image: photo, cutout: cutout != null),
+              ),
             ),
           if (note.score != null)
             Padding(

@@ -91,6 +91,7 @@ class TastingNote {
     this.score,
     this.color,
     this.photo,
+    this.cutout,
     List<int>? nose,
     List<int>? palate,
     List<int>? retronasal,
@@ -137,6 +138,9 @@ class TastingNote {
   /// 앱 저장소 안의 사진 파일 이름 (전체 경로가 아님)
   String? photo;
 
+  /// 배경을 지우고 병만 오려낸 PNG 파일 이름. 진열장에 이걸 세웁니다.
+  String? cutout;
+
   /// 향 / Nose (aromaAxes 순서, 각 0 ~ radarMax)
   final List<int> nose;
 
@@ -171,6 +175,7 @@ class TastingNote {
     'score': score,
     'color': color,
     'photo': photo,
+    'cutout': cutout,
     'nose': nose,
     'palate': palate,
     'retronasal': retronasal,
@@ -192,6 +197,7 @@ class TastingNote {
     score: (j['score'] as num?)?.toDouble(),
     color: (j['color'] as num?)?.toDouble(),
     photo: j['photo'] as String?,
+    cutout: j['cutout'] as String?,
     nose: _intList(j['nose']),
     palate: _intList(j['palate']),
     retronasal: _intList(j['retronasal']),

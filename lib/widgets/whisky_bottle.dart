@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:material_ui/material_ui.dart';
 
 import '../models/tasting_note.dart';
@@ -88,7 +86,7 @@ class WhiskyBottle extends StatelessWidget {
   });
 
   final TastingNote note;
-  final File? photo;
+  final ImageProvider? photo;
   final double width;
   final double height;
 
@@ -132,13 +130,13 @@ class _Label extends StatelessWidget {
   const _Label({required this.note, this.photo});
 
   final TastingNote note;
-  final File? photo;
+  final ImageProvider? photo;
 
   @override
   Widget build(BuildContext context) {
     final p = photo;
     final Widget content = p != null
-        ? Image.file(p, fit: BoxFit.cover, errorBuilder: (_, _, _) => _text())
+        ? Image(image: p, fit: BoxFit.cover, errorBuilder: (_, _, _) => _text())
         : _text();
     return ClipRRect(
       borderRadius: BorderRadius.circular(2),
@@ -355,4 +353,85 @@ class _GlassShinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_GlassShinePainter old) => old.shape != shape;
+}
+
+/// 진열장에 세우는 병. 배경을 지운 사진(cutout)이 있으면 실제 병 사진을,
+/// 없으면 그린 병을 보여줍니다.
+///
+/// [reflection]이 0보다 크면 유리 선반에 비친 반사를 병 아래에 그립니다.
+class BottleFigure extends StatelessWidget {
+  const BottleFigure({
+    super.key,
+    required this.note,
+    required this.cutout,
+    required this.photo,
+    required this.height,
+    this.reflection = 0,
+    this.reflectionOpacity = 0.22,
+  });
+
+  final TastingNote note;
+  final ImageProvider? cutout;
+  final ImageProvider? photo;
+  final double height;
+  final double reflection;
+  final double reflectionOpacity;
+
+  Widget _bottle() {
+    final c = cutout;
+    final drawn = WhiskyBottle(
+      note: note,
+      photo: photo,
+      width: height * 0.41,
+      height: height,
+    );
+    if (c == null) return drawn;
+    return Image(
+      image: c,
+      height: height,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.medium,
+      errorBuilder: (_, _, _) => drawn,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottle = _bottle();
+    if (reflection <= 0) return bottle;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        bottle,
+        // 병을 뒤집어 아래쪽만 흐리게 보여줍니다.
+        SizedBox(
+          height: reflection,
+          child: ClipRect(
+            child: OverflowBox(
+              alignment: Alignment.topCenter,
+              maxHeight: height,
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: reflectionOpacity,
+                  child: Transform.flip(
+                    flipY: true,
+                    child: ShaderMask(
+                      blendMode: BlendMode.dstIn,
+                      shaderCallback: (r) => const LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [Colors.white, Colors.transparent],
+                        stops: [0, 0.3],
+                      ).createShader(r),
+                      child: _bottle(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

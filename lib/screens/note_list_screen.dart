@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../data/app_settings.dart';
 import '../data/note_store.dart';
 import '../models/tasting_note.dart';
 import '../theme.dart';
@@ -8,12 +9,18 @@ import '../widgets/color_scale.dart';
 import '../widgets/note_photo.dart';
 import 'note_detail_screen.dart';
 import 'note_edit_screen.dart';
+import 'settings_screen.dart';
 
 /// 첫 화면: 마셔본 위스키 목록.
 class NoteListScreen extends StatefulWidget {
-  const NoteListScreen({super.key, required this.store});
+  const NoteListScreen({
+    super.key,
+    required this.store,
+    required this.settings,
+  });
 
   final NoteStore store;
+  final AppSettings settings;
 
   @override
   State<NoteListScreen> createState() => _NoteListScreenState();
@@ -51,6 +58,16 @@ class _NoteListScreenState extends State<NoteListScreen> {
         title: const Text('Whisky Library'),
         actions: [
           IconButton(
+            tooltip: '설정',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) =>
+                    SettingsScreen(settings: widget.settings, store: store),
+              ),
+            ),
+          ),
+          IconButton(
             tooltip: _cabinet ? '목록으로 보기' : '진열장으로 보기',
             icon: Icon(_cabinet ? Icons.view_list : Icons.shelves),
             onPressed: () => setState(() => _cabinet = !_cabinet),
@@ -65,8 +82,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
         label: const Text('Add Whisky'),
       ),
       body: ListenableBuilder(
-        listenable: store,
+        listenable: Listenable.merge([store, widget.settings]),
         builder: (context, _) {
+          final style = widget.settings.cabinetStyle;
           if (!store.loaded) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -75,6 +93,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
             return _cabinet
                 ? CabinetView(
                     store: store,
+                    style: style,
                     notes: const [],
                     onOpen: _open,
                     emptyMessage: const _EmptyState(onDark: true),
@@ -106,7 +125,12 @@ class _NoteListScreenState extends State<NoteListScreen> {
               ),
               Expanded(
                 child: _cabinet
-                    ? CabinetView(store: store, notes: notes, onOpen: _open)
+                    ? CabinetView(
+                        store: store,
+                        style: style,
+                        notes: notes,
+                        onOpen: _open,
+                      )
                     : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(12, 4, 12, 96),
                         itemCount: notes.length,
@@ -156,7 +180,10 @@ class _NoteCard extends StatelessWidget {
               SizedBox(
                 width: 88,
                 child: NotePhoto(
-                  file: store.storage.photoFile(note.photo),
+                  image:
+                      store.storage.image(note.cutout) ??
+                      store.storage.image(note.photo),
+                  cutout: note.cutout != null,
                   icon: 32,
                 ),
               ),

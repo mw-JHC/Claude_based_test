@@ -150,9 +150,55 @@ const finishScale = CharacterScale('finish', '짧다', '길다');
 const scaleSteps = 9;
 const scaleDefault = 5;
 
-/// 색상 스케일 범위 (PDF 기준 0.0 ~ 2.0).
+/// 색상 스케일 범위 (0.0 연한 짚색 ~ 1.0 짙은 마호가니).
 const colorMin = 0.0;
-const colorMax = 2.0;
+const colorMax = 1.0;
+
+/// 한 병에 남기는 이야기 한 편: 그날의 맛, 함께한 사람, 사진.
+class StoryEntry {
+  StoryEntry({
+    required this.id,
+    required this.date,
+    this.text = '',
+    this.companions = '',
+    List<String>? photos,
+  }) : photos = photos ?? [];
+
+  factory StoryEntry.create() => StoryEntry(
+    id: DateTime.now().microsecondsSinceEpoch.toString(),
+    date: DateTime.now(),
+  );
+
+  final String id;
+  DateTime date;
+
+  /// 그날의 맛과 이야기
+  String text;
+
+  /// 함께 마신 사람
+  String companions;
+
+  /// 앱 저장소 안의 사진 파일 이름들
+  final List<String> photos;
+
+  StoryEntry copy() => StoryEntry.fromJson(toJson());
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'date': date.toIso8601String(),
+    'text': text,
+    'companions': companions,
+    'photos': photos,
+  };
+
+  factory StoryEntry.fromJson(Map<String, dynamic> j) => StoryEntry(
+    id: j['id'] as String,
+    date: DateTime.tryParse(j['date'] as String? ?? '') ?? DateTime.now(),
+    text: j['text'] as String? ?? '',
+    companions: j['companions'] as String? ?? '',
+    photos: (j['photos'] as List?)?.cast<String>().toList(),
+  );
+}
 
 class TastingNote {
   TastingNote({
@@ -174,6 +220,8 @@ class TastingNote {
     Map<String, int>? characters,
     this.finish = scaleDefault,
     this.overall = '',
+    this.emptiedAt,
+    List<StoryEntry>? stories,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) : nose = _fit(nose, aromaAxes.length),
@@ -183,6 +231,7 @@ class TastingNote {
          for (final s in characterScales)
            s.key: characters?[s.key] ?? scaleDefault,
        },
+       stories = stories ?? [],
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? createdAt ?? DateTime.now();
 
@@ -244,6 +293,24 @@ class TastingNote {
   /// 총평 / Overall
   String overall;
 
+  /// 병을 비운 날. 값이 있으면 진열장 대신 Memory Library에 놓입니다.
+  DateTime? emptiedAt;
+  bool get isEmpty => emptiedAt != null;
+
+  /// 이 병과 함께한 이야기들 (날짜별 기록)
+  final List<StoryEntry> stories;
+
+  /// 날짜가 최근인 이야기부터
+  List<StoryEntry> get storiesByDate =>
+      [...stories]..sort((a, b) => b.date.compareTo(a.date));
+
+  /// 이 노트가 쓰는 모든 사진 파일 (병 사진, 오려낸 병, 이야기 사진)
+  Set<String> get files => {
+    ?photo,
+    ?cutout,
+    for (final s in stories) ...s.photos,
+  };
+
   final DateTime createdAt;
   DateTime updatedAt;
 
@@ -268,6 +335,10 @@ class TastingNote {
     'characters': characters,
     'finish': finish,
     'overall': overall,
+    'emptiedAt': emptiedAt?.toIso8601String(),
+    'stories': [for (final s in stories) s.toJson()],
+    // 색상 값의 범위 버전 (1: 예전 0~2, 2: 지금 0~1)
+    'colorScale': 2,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
   };
@@ -306,7 +377,12 @@ class TastingNote {
       abv: (j['abv'] as num?)?.toDouble(),
       price: j['price'] as String? ?? '',
       score: (j['score'] as num?)?.toDouble(),
-      color: (j['color'] as num?)?.toDouble(),
+      // 예전 노트(0~2 범위)는 0~1 범위로 줄입니다.
+      color: switch ((j['color'] as num?)?.toDouble()) {
+        null => null,
+        final c when j['colorScale'] == 2 => c,
+        final c => (c / 2).clamp(colorMin, colorMax),
+      },
       photo: j['photo'] as String?,
       cutout: j['cutout'] as String?,
       nose: _intList(j['nose']),
@@ -317,6 +393,11 @@ class TastingNote {
       ),
       finish: (j['finish'] as num?)?.toInt() ?? scaleDefault,
       overall: j['overall'] as String? ?? '',
+      emptiedAt: DateTime.tryParse(j['emptiedAt'] as String? ?? ''),
+      stories: [
+        for (final e in (j['stories'] as List? ?? const []))
+          StoryEntry.fromJson(Map<String, dynamic>.from(e as Map)),
+      ],
       createdAt: DateTime.tryParse(j['createdAt'] as String? ?? ''),
       updatedAt: DateTime.tryParse(j['updatedAt'] as String? ?? ''),
     );

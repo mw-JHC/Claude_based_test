@@ -9,6 +9,7 @@ import '../widgets/flavor_wheel.dart';
 import '../widgets/sheet_section.dart';
 import '../widgets/whisky_bottle.dart';
 import 'note_edit_screen.dart';
+import 'story_edit_screen.dart';
 
 /// 저장된 노트를 보는 화면.
 class NoteDetailScreen extends StatelessWidget {
@@ -140,9 +141,17 @@ class NoteDetailScreen extends StatelessWidget {
                           ],
                         ),
                       ),
+                    _Stories(note: note, store: store),
+                    const SizedBox(height: 6),
+                    _emptyButton(context, note),
+                    const SizedBox(height: 18),
                     Center(
                       child: Text(
-                        '${_date(note.createdAt)} 기록',
+                        [
+                          '${_date(note.createdAt)} 기록',
+                          if (note.emptiedAt != null)
+                            '${_date(note.emptiedAt!)} 비움',
+                        ].join('  ·  '),
                         style: const TextStyle(
                           fontSize: 12,
                           color: NoteColors.faint,
@@ -156,6 +165,61 @@ class NoteDetailScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  /// 병 비우기 / 다시 진열장으로. 노트와 이야기는 지우지 않고 자리만 옮깁니다.
+  Widget _emptyButton(BuildContext context, TastingNote note) {
+    final empty = note.isEmpty;
+    return OutlinedButton.icon(
+      onPressed: () => _toggleEmpty(context, note),
+      icon: Icon(empty ? Icons.shelves : Icons.local_drink_outlined),
+      label: Text(empty ? '다시 진열장에 놓기' : '병 비우기 (Empty)'),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(50),
+        foregroundColor: empty ? NoteColors.text : NoteColors.gold,
+        side: BorderSide(
+          color: empty
+              ? NoteColors.line
+              : NoteColors.gold.withValues(alpha: 0.5),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _toggleEmpty(BuildContext context, TastingNote note) async {
+    final empty = note.isEmpty;
+    if (!empty) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('병을 비울까요?'),
+          content: const Text(
+            '진열장에서 Memory Library로 옮겨집니다.\n노트와 이야기는 그대로 남아요.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('비우기'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    final updated = note.copy()..emptiedAt = empty ? null : DateTime.now();
+    await store.upsert(updated);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          empty ? '진열장에 다시 놓았어요.' : 'Memory Library로 옮겼어요. 고마웠어, ${note.name}!',
+        ),
+      ),
     );
   }
 
@@ -181,6 +245,8 @@ class NoteDetailScreen extends StatelessWidget {
       if (note.type != null) (Icons.local_bar_outlined, note.type!.label),
       if (note.regionLabel.isNotEmpty) (Icons.place_outlined, note.regionLabel),
       if (note.ageCask.isNotEmpty) (Icons.hourglass_bottom, note.ageCask),
+      if (note.emptiedAt != null)
+        (Icons.auto_stories_outlined, '빈 병 · ${_date(note.emptiedAt!)}'),
     ];
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,7 +355,7 @@ class NoteDetailScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Text(note.color!.toStringAsFixed(1), style: valueStyle),
+                    Text(formatColor(note.color!), style: valueStyle),
                   ],
                 ),
         ),
@@ -452,6 +518,212 @@ class _FlavorCardState extends State<_FlavorCard> {
           const SizedBox(height: 8),
           FlavorWheel(axes: axes, values: values, color: color),
         ],
+      ),
+    );
+  }
+}
+
+/// 이 병과 함께한 이야기들 (날짜별) + 이야기 추가 버튼.
+class _Stories extends StatelessWidget {
+  const _Stories({required this.note, required this.store});
+
+  final TastingNote note;
+  final NoteStore store;
+
+  void _edit(BuildContext context, [StoryEntry? story]) =>
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              StoryEditScreen(store: store, note: note, story: story),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final stories = note.storiesByDate;
+    return SheetSection(
+      title: '이야기',
+      subtitle: 'Stories',
+      trailing: stories.isEmpty
+          ? null
+          : Text(
+              '${stories.length}',
+              style: const TextStyle(color: NoteColors.hint, fontSize: 13),
+            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (stories.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: Text(
+                '이 병을 마신 날의 맛, 함께한 사람, 사진을 남겨 보세요.',
+                style: TextStyle(color: NoteColors.hint, height: 1.5),
+              ),
+            ),
+          for (final (i, story) in stories.indexed)
+            _StoryCard(
+              story: story,
+              store: store,
+              last: i == stories.length - 1,
+              onTap: () => _edit(context, story),
+            ),
+          FilledButton.tonalIcon(
+            onPressed: () => _edit(context),
+            icon: const Icon(Icons.add),
+            label: const Text('Add Story'),
+            style: FilledButton.styleFrom(
+              backgroundColor: NoteColors.surfaceHigh,
+              foregroundColor: NoteColors.gold,
+              minimumSize: const Size.fromHeight(46),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 이야기 한 편: 왼쪽에 날짜 타임라인, 오른쪽에 내용과 사진.
+class _StoryCard extends StatelessWidget {
+  const _StoryCard({
+    required this.story,
+    required this.store,
+    required this.last,
+    required this.onTap,
+  });
+
+  final StoryEntry story;
+  final NoteStore store;
+  final bool last;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 타임라인 점과 선
+            SizedBox(
+              width: 20,
+              child: Column(
+                children: [
+                  const SizedBox(height: 4),
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: NoteColors.accentGradient,
+                    ),
+                  ),
+                  if (!last)
+                    Expanded(
+                      child: Container(width: 1.5, color: NoteColors.line),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      storyDate(story.date),
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: NoteColors.gold,
+                      ),
+                    ),
+                    if (story.companions.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.people_outline,
+                            size: 14,
+                            color: NoteColors.hint,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              story.companions,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                color: NoteColors.hint,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (story.text.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        story.text,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          height: 1.55,
+                          color: NoteColors.text,
+                        ),
+                      ),
+                    ],
+                    if (story.photos.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 92,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: story.photos.length,
+                          separatorBuilder: (_, _) => const SizedBox(width: 6),
+                          itemBuilder: (context, i) {
+                            final img = store.storage.image(story.photos[i]);
+                            return GestureDetector(
+                              onTap: img == null
+                                  ? null
+                                  : () => _showPhoto(context, img),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: SizedBox(
+                                  width: 92,
+                                  child: img == null
+                                      ? Container(color: NoteColors.surfaceHigh)
+                                      : Image(image: img, fit: BoxFit.cover),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 사진을 누르면 크게 봅니다 (두 손가락으로 확대).
+  void _showPhoto(BuildContext context, ImageProvider image) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (c) => GestureDetector(
+        onTap: () => Navigator.of(c).pop(),
+        child: InteractiveViewer(
+          child: Center(child: Image(image: image)),
+        ),
       ),
     );
   }

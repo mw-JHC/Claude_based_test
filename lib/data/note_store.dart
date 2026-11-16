@@ -133,6 +133,14 @@ class NoteStore extends ChangeNotifier {
     [..._notes]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)),
   );
 
+  /// 진열장에 있는 (아직 비우지 않은) 병들
+  List<TastingNote> get library => notes.where((n) => !n.isEmpty).toList();
+
+  /// Memory Library의 빈 병들. 최근에 비운 병부터.
+  List<TastingNote> get memories =>
+      _notes.where((n) => n.isEmpty).toList()
+        ..sort((a, b) => b.emptiedAt!.compareTo(a.emptiedAt!));
+
   TastingNote? byId(String id) {
     for (final n in _notes) {
       if (n.id == id) return n;
@@ -159,12 +167,11 @@ class NoteStore extends ChangeNotifier {
       _notes.add(note);
     }
     await storage.saveAll(_notes);
-    // 바뀐 사진은 지웁니다.
-    for (final (before, after) in [
-      (old?.photo, note.photo),
-      (old?.cutout, note.cutout),
-    ]) {
-      if (before != null && before != after) await storage.deletePhoto(before);
+    // 더 이상 쓰지 않는 사진(바꾸거나 지운 사진)은 지웁니다.
+    if (old != null) {
+      for (final name in old.files.difference(note.files)) {
+        await storage.deletePhoto(name);
+      }
     }
     notifyListeners();
   }
@@ -174,8 +181,8 @@ class NoteStore extends ChangeNotifier {
     if (note == null) return;
     _notes.remove(note);
     await storage.saveAll(_notes);
-    for (final name in [note.photo, note.cutout]) {
-      if (name != null) await storage.deletePhoto(name);
+    for (final name in note.files) {
+      await storage.deletePhoto(name);
     }
     notifyListeners();
   }

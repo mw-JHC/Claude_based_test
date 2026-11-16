@@ -99,7 +99,7 @@ class WhiskyBottle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shape = BottleShape.of(note.type, note.origin);
-    final liquid = whiskyColor(note.color ?? 0.8);
+    final liquid = whiskyColor(note.color ?? 0.4);
     final labelTop = height * (shape.shoulderBottom + 0.10);
     final labelHeight = height * 0.30;
     return SizedBox(
@@ -110,7 +110,11 @@ class WhiskyBottle extends StatelessWidget {
         children: [
           Positioned.fill(
             child: CustomPaint(
-              painter: _BottlePainter(shape: shape, liquid: liquid),
+              painter: _BottlePainter(
+                shape: shape,
+                liquid: liquid,
+                empty: note.isEmpty,
+              ),
             ),
           ),
           Positioned(
@@ -236,10 +240,17 @@ Path _bottlePath(Size size, BottleShape s) {
 }
 
 class _BottlePainter extends CustomPainter {
-  _BottlePainter({required this.shape, required this.liquid});
+  _BottlePainter({
+    required this.shape,
+    required this.liquid,
+    this.empty = false,
+  });
 
   final BottleShape shape;
   final Color liquid;
+
+  /// 빈 병이면 바닥에 마지막 한 모금만 남깁니다.
+  final bool empty;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -264,7 +275,7 @@ class _BottlePainter extends CustomPainter {
     );
 
     // 위스키 (가운데가 밝고 가장자리가 어두운 원통 음영)
-    final level = h * (shape.shoulderBottom - 0.04);
+    final level = empty ? h - 9 : h * (shape.shoulderBottom - 0.04);
     Color dark(double t) => Color.lerp(liquid, Colors.black, t)!;
     Color light(double t) => Color.lerp(liquid, Colors.white, t)!;
     canvas.drawRect(
@@ -327,7 +338,7 @@ class _BottlePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_BottlePainter old) =>
-      old.liquid != liquid || old.shape != shape;
+      old.liquid != liquid || old.shape != shape || old.empty != empty;
 }
 
 /// 유리 표면의 세로 반사광.
@@ -400,12 +411,18 @@ class BottleFigure extends StatelessWidget {
       height: height,
     );
     if (c == null) return drawn;
-    return Image(
+    final image = Image(
       image: c,
       height: height,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.medium,
       errorBuilder: (_, _, _) => drawn,
+    );
+    if (!note.isEmpty) return image;
+    // 빈 병 사진은 바랜 추억처럼 색을 빼고 살짝 투명하게.
+    return Opacity(
+      opacity: 0.85,
+      child: ColorFiltered(colorFilter: _faded, child: image),
     );
   }
 
@@ -449,3 +466,11 @@ class BottleFigure extends StatelessWidget {
     );
   }
 }
+
+/// 채도를 낮추고 따뜻한 세피아 기운을 더하는 색 필터.
+const _faded = ColorFilter.matrix(<double>[
+  0.50, 0.40, 0.10, 0, 12, //
+  0.35, 0.55, 0.10, 0, 6, //
+  0.25, 0.35, 0.40, 0, 0, //
+  0, 0, 0, 1, 0, //
+]);

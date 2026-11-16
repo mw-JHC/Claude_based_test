@@ -22,6 +22,8 @@ class CabinetView extends StatefulWidget {
     required this.onOpen,
     this.style = CabinetStyle.woodShop,
     this.onPickStyle,
+    this.onOpenMemories,
+    this.memoryCount = 0,
     this.showFooter = true,
     this.emptyMessage,
   });
@@ -31,8 +33,14 @@ class CabinetView extends StatefulWidget {
   final void Function(TastingNote note) onOpen;
   final CabinetStyle style;
 
-  /// 아래쪽 진열장 이름을 누르면 불립니다 (분위기 바꾸기).
+  /// 아래쪽 진열장 이름을 누르면 불립니다 (분위기 바꾸기). null이면 숨김.
   final VoidCallback? onPickStyle;
+
+  /// 아래쪽 Memory Library 버튼을 누르면 불립니다. null이면 숨김.
+  final VoidCallback? onOpenMemories;
+
+  /// Memory Library 버튼에 보여줄 빈 병 수
+  final int memoryCount;
 
   /// 아래쪽 줄 (진열장 이름, 페이지 표시). 설정 미리보기에서는 숨깁니다.
   final bool showFooter;
@@ -46,9 +54,12 @@ class CabinetView extends StatefulWidget {
 
 /// 진열장 한 칸의 크기 계산 결과.
 class _Layout {
-  const _Layout(this.perRow, this.rows);
+  const _Layout(this.perRow, this.rows, this.bottle);
   final int perRow;
   final int rows;
+
+  /// 병 높이. 화면이 낮으면 병을 조금 줄여서 선반을 더 놓습니다.
+  final double bottle;
   int get capacity => perRow * rows;
 }
 
@@ -64,23 +75,29 @@ class _CabinetViewState extends State<CabinetView> {
     super.dispose();
   }
 
-  /// 화면 크기에 맞춰 한 진열장에 들어갈 줄 수와 한 줄의 병 수를 정합니다.
+  /// 화면 크기에 맞춰 한 진열장에 들어갈 줄 수, 한 줄의 병 수, 병 크기를 정합니다.
   _Layout _layout(Size size) {
-    final (perRow, overhead, minShelf) = switch (widget.style) {
-      CabinetStyle.woodShop => (
-        math.max(2, ((size.width - 72) / 84).floor()),
-        40.0,
-        205.0,
-      ),
-      CabinetStyle.backBar => (
-        math.max(2, ((size.width - 60) / 84).floor()),
-        34.0,
-        222.0,
-      ),
-      CabinetStyle.museum => (2, 24.0, 300.0),
+    // (칸 최소 너비, 테두리 높이, 선반 최소 높이, 선반에서 병 말고 차지하는 높이,
+    //  병 최소/최대 높이)
+    final (
+      slot,
+      overhead,
+      minShelf,
+      fixed,
+      minBottle,
+      maxBottle,
+    ) = switch (widget.style) {
+      CabinetStyle.woodShop => (76.0, 40.0, 172.0, 64.0, 100.0, 160.0),
+      CabinetStyle.backBar => (76.0, 34.0, 180.0, 70.0, 100.0, 160.0),
+      CabinetStyle.museum => (150.0, 24.0, 262.0, 150.0, 110.0, 190.0),
     };
-    final rows = math.max(1, ((size.height - overhead) / minShelf).floor());
-    return _Layout(perRow, rows);
+    final perRow = widget.style == CabinetStyle.museum
+        ? 2
+        : math.max(2, ((size.width - 64) / slot).floor());
+    final usable = size.height - overhead;
+    final rows = math.max(1, (usable / minShelf).floor());
+    final bottle = (usable / rows - fixed).clamp(minBottle, maxBottle);
+    return _Layout(perRow, rows, bottle);
   }
 
   double get _pagePosition {
@@ -159,6 +176,14 @@ class _CabinetViewState extends State<CabinetView> {
                   Positioned.fill(child: pages),
                   if (notes.isEmpty && widget.emptyMessage != null)
                     Center(child: widget.emptyMessage),
+                  // 몇 번째 진열장인지 (진열장 아래 테두리 위에 겹쳐 표시)
+                  if (pageCount > 1)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: IgnorePointer(child: _pageDots(pageCount)),
+                    ),
                 ],
               ),
             ),
@@ -169,15 +194,42 @@ class _CabinetViewState extends State<CabinetView> {
     );
   }
 
+  Widget _pageDots(int pageCount) => Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      for (var i = 0; i < pageCount && i < 8; i++)
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: i == _page ? 16 : 6,
+          height: 6,
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          decoration: BoxDecoration(
+            color: i == _page
+                ? NoteColors.amber
+                : NoteColors.text.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+      const SizedBox(width: 6),
+      Text(
+        '${_page + 1}/$pageCount',
+        style: const TextStyle(fontSize: 11, color: NoteColors.text),
+      ),
+    ],
+  );
+
   Widget _footer(int pageCount) {
+    const textStyle = TextStyle(fontSize: 13, fontWeight: FontWeight.w600);
     return SizedBox(
       height: _footerHeight,
       child: Padding(
-        padding: const EdgeInsets.only(left: 8, right: 180),
+        // 오른쪽은 Add Whisky 버튼 자리
+        padding: const EdgeInsets.only(left: 8, right: 170),
         child: Row(
           children: [
-            Flexible(
-              child: TextButton.icon(
+            // 분위기 버튼은 필요한 만큼만, 남는 자리는 Memories 버튼이 씁니다.
+            if (widget.onPickStyle != null)
+              TextButton.icon(
                 onPressed: widget.onPickStyle,
                 icon: const Icon(Icons.swap_horiz, size: 18),
                 label: Text(
@@ -186,32 +238,36 @@ class _CabinetViewState extends State<CabinetView> {
                 ),
                 style: TextButton.styleFrom(
                   foregroundColor: NoteColors.hint,
-                  textStyle: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                  textStyle: textStyle,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+              ),
+            if (widget.onOpenMemories != null)
+              Flexible(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: OutlinedButton.icon(
+                    onPressed: widget.onOpenMemories,
+                    icon: const Icon(Icons.auto_stories_outlined, size: 17),
+                    label: Text(
+                      widget.memoryCount > 0
+                          ? 'Memories ${widget.memoryCount}'
+                          : 'Memories',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: NoteColors.gold,
+                      side: BorderSide(
+                        color: NoteColors.gold.withValues(alpha: 0.5),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      minimumSize: const Size(0, 38),
+                      shape: const StadiumBorder(),
+                      textStyle: textStyle,
+                    ),
                   ),
                 ),
               ),
-            ),
-            if (pageCount > 1) ...[
-              const SizedBox(width: 4),
-              for (var i = 0; i < pageCount && i < 8; i++)
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: i == _page ? 16 : 6,
-                  height: 6,
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  decoration: BoxDecoration(
-                    color: i == _page ? NoteColors.amber : NoteColors.line,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-              const SizedBox(width: 6),
-              Text(
-                '${_page + 1}/$pageCount',
-                style: const TextStyle(fontSize: 12, color: NoteColors.hint),
-              ),
-            ],
           ],
         ),
       ),
@@ -227,15 +283,15 @@ class _CabinetViewState extends State<CabinetView> {
         ),
     ];
     return switch (widget.style) {
-      CabinetStyle.woodShop => _woodShop(layout.perRow, rows, tilt),
-      CabinetStyle.backBar => _backBar(layout.perRow, rows, tilt),
-      CabinetStyle.museum => _museum(rows, tilt),
+      CabinetStyle.woodShop => _woodShop(layout, rows, tilt),
+      CabinetStyle.backBar => _backBar(layout, rows, tilt),
+      CabinetStyle.museum => _museum(layout, rows, tilt),
     };
   }
 
   // ───────────────────────── 고급 위스키숍 원목장 ─────────────────────────
 
-  Widget _woodShop(int perRow, List<List<TastingNote>> rows, double tilt) {
+  Widget _woodShop(_Layout layout, List<List<TastingNote>> rows, double tilt) {
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
       decoration: BoxDecoration(
@@ -265,10 +321,10 @@ class _CabinetViewState extends State<CabinetView> {
             for (final row in rows)
               Expanded(
                 child: _WoodShelf(
-                  slots: perRow,
+                  slots: layout.perRow,
                   tilt: tilt,
                   notes: row,
-                  bottle: (n) => _bottle(n, 150),
+                  bottle: (n) => _bottle(n, layout.bottle),
                 ),
               ),
           ],
@@ -279,7 +335,7 @@ class _CabinetViewState extends State<CabinetView> {
 
   // ───────────────────────── 바 뒤편 진열장 ─────────────────────────
 
-  Widget _backBar(int perRow, List<List<TastingNote>> rows, double tilt) {
+  Widget _backBar(_Layout layout, List<List<TastingNote>> rows, double tilt) {
     return Container(
       margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
       decoration: BoxDecoration(
@@ -307,7 +363,7 @@ class _CabinetViewState extends State<CabinetView> {
             for (final row in rows)
               Expanded(
                 child: _BarShelf(
-                  slots: perRow,
+                  slots: layout.perRow,
                   tilt: tilt,
                   notes: row,
                   bottle: (n, mirror) => mirror
@@ -315,9 +371,9 @@ class _CabinetViewState extends State<CabinetView> {
                           note: n,
                           cutout: widget.store.storage.image(n.cutout),
                           photo: widget.store.storage.image(n.photo),
-                          height: 150,
+                          height: layout.bottle,
                         )
-                      : _bottle(n, 150, reflection: 16),
+                      : _bottle(n, layout.bottle, reflection: 16),
                 ),
               ),
           ],
@@ -328,7 +384,7 @@ class _CabinetViewState extends State<CabinetView> {
 
   // ───────────────────────── 박물관 유리 케이스 ─────────────────────────
 
-  Widget _museum(List<List<TastingNote>> rows, double tilt) {
+  Widget _museum(_Layout layout, List<List<TastingNote>> rows, double tilt) {
     return DecoratedBox(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -352,7 +408,8 @@ class _CabinetViewState extends State<CabinetView> {
                         child: _MuseumCase(
                           note: i < row.length ? row[i] : null,
                           tilt: tilt,
-                          bottle: (n) => _bottle(n, 180, reflection: 14),
+                          bottle: (n) =>
+                              _bottle(n, layout.bottle, reflection: 14),
                         ),
                       ),
                   ],
@@ -583,7 +640,7 @@ class _BrassPlate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final score = note.score;
+    final badge = _badge(note);
     const style = TextStyle(
       fontSize: 9.5,
       fontWeight: FontWeight.bold,
@@ -616,9 +673,9 @@ class _BrassPlate extends StatelessWidget {
               style: style,
             ),
           ),
-          if (score != null)
+          if (badge != null)
             Text(
-              ' · ${_fmt(score)}',
+              ' · $badge',
               style: style.copyWith(color: const Color(0xFF7A1E0A)),
             ),
         ],
@@ -743,7 +800,7 @@ class _BarShelf extends StatelessWidget {
               slots,
               notes,
               (n) => Text(
-                n.score == null ? n.name : '${n.name} · ${_fmt(n.score!)}',
+                [n.name, ?_badge(n)].join(' · '),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -1072,10 +1129,7 @@ class _Plaque extends StatelessWidget {
             ),
           ),
           Text(
-            [
-              sub,
-              if (note.score != null) _fmt(note.score!),
-            ].where((s) => s.isNotEmpty).join('  ·  '),
+            [sub, ?_badge(note)].where((s) => s.isNotEmpty).join('  ·  '),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: Color(0xFF9A8F7C), fontSize: 10.5),
@@ -1087,6 +1141,15 @@ class _Plaque extends StatelessWidget {
 }
 
 // ═════════════════════════════ 공통 ═════════════════════════════
+
+/// 이름표에 이름과 함께 붙는 값: 진열장에서는 점수, 빈 병은 비운 날.
+String? _badge(TastingNote n) {
+  final e = n.emptiedAt;
+  if (e != null) {
+    return '${e.year % 100}.${e.month.toString().padLeft(2, '0')}.${e.day.toString().padLeft(2, '0')}';
+  }
+  return n.score == null ? null : _fmt(n.score!);
+}
 
 String _fmt(double v) =>
     v == v.roundToDouble() ? '${v.toInt()}' : v.toStringAsFixed(1);

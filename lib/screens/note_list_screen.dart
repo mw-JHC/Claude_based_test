@@ -10,7 +10,9 @@ import '../widgets/sheet_section.dart';
 import '../widgets/whisky_bottle.dart';
 import 'note_detail_screen.dart';
 import 'note_edit_screen.dart';
+import 'memory_library_screen.dart';
 import 'settings_screen.dart';
+import 'stats_screen.dart';
 
 /// 첫 화면: 내 위스키 진열장 (또는 목록).
 class NoteListScreen extends StatefulWidget {
@@ -76,7 +78,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
           listenable: Listenable.merge([store, widget.settings]),
           builder: (context, _) {
             final style = widget.settings.cabinetStyle;
-            final all = store.notes;
+            // 비운 병은 Memory Library로 갑니다.
+            final all = store.library;
+            final memoryCount = store.memories.length;
             final notes = all.where(_matches).toList();
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -98,6 +102,8 @@ class _NoteListScreenState extends State<NoteListScreen> {
                             notes: notes,
                             onOpen: _open,
                             onPickStyle: _pickStyle,
+                            onOpenMemories: _openMemories,
+                            memoryCount: memoryCount,
                             emptyMessage: all.isEmpty
                                 ? const _EmptyState(onDark: true)
                                 : const _NoMatch(),
@@ -108,7 +114,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                       : notes.isEmpty
                       ? const _NoMatch()
                       : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                           itemCount: notes.length,
                           separatorBuilder: (_, _) =>
                               const SizedBox(height: 10),
@@ -119,6 +125,38 @@ class _NoteListScreenState extends State<NoteListScreen> {
                           ),
                         ),
                 ),
+                // 목록 보기에서도 Memory Library로 갈 수 있게
+                if (!_cabinet)
+                  SizedBox(
+                    height: 58,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 16, right: 176),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: _openMemories,
+                          icon: const Icon(
+                            Icons.auto_stories_outlined,
+                            size: 17,
+                          ),
+                          label: Text(
+                            memoryCount > 0
+                                ? 'Memories $memoryCount'
+                                : 'Memories',
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: NoteColors.gold,
+                            side: BorderSide(
+                              color: NoteColors.gold.withValues(alpha: 0.5),
+                            ),
+                            minimumSize: const Size(0, 38),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            shape: const StadiumBorder(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             );
           },
@@ -148,7 +186,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                   'Whisky Library',
                   style: TextStyle(
                     fontFamily: serif,
-                    fontSize: 30,
+                    fontSize: 27,
                     fontWeight: FontWeight.w700,
                     height: 1.1,
                     color: NoteColors.text,
@@ -166,6 +204,16 @@ class _NoteListScreenState extends State<NoteListScreen> {
               ],
             ),
           ),
+          _RoundIconButton(
+            tooltip: '통계',
+            icon: Icons.insights_outlined,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => StatsScreen(store: widget.store),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           _RoundIconButton(
             tooltip: _cabinet ? '목록으로 보기' : '진열장으로 보기',
             icon: _cabinet ? Icons.view_agenda_outlined : Icons.shelves,
@@ -258,6 +306,13 @@ class _NoteListScreenState extends State<NoteListScreen> {
       ),
     );
   }
+
+  void _openMemories() => Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) =>
+          MemoryLibraryScreen(store: widget.store, settings: widget.settings),
+    ),
+  );
 
   /// 진열장 아래 이름을 누르면 바로 분위기를 바꿀 수 있습니다.
   Future<void> _pickStyle() async {

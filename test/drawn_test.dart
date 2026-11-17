@@ -46,7 +46,7 @@ void main() {
     expect(find.byType(Image), findsOneWidget);
   });
 
-  testWidgets('사진을 찍은 뒤 병 사진과 그린 병 중에서 고른다', (tester) async {
+  testWidgets('사진을 찍은 뒤 병만/원본/그린 병 중에서 고른다', (tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 2.5;
     addTearDown(tester.view.reset);
@@ -63,10 +63,8 @@ void main() {
     await tester.runAsync(() => state.usePhotoForTest('/tmp/x.jpg') as Future);
     await tester.pump();
 
-    // 고를 수 있는 건 오려낸 병 사진과 그린 병, 두 가지
-    expect(find.byIcon(Icons.photo_camera_outlined), findsWidgets);
-    expect(find.byIcon(Icons.image_outlined), findsNothing);
-    expect(find.byType(WhiskyBottle), findsNothing);
+    expect(find.byIcon(Icons.auto_awesome), findsOneWidget);
+    expect(find.byIcon(Icons.image_outlined), findsOneWidget);
     final drawn = find.byIcon(Icons.brush_outlined);
     await tester.ensureVisible(drawn);
     await tester.tap(drawn);

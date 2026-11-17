@@ -56,7 +56,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   Uint8List? _pickedCutout;
 
   /// 진열장과 상세 화면에 보여줄 병 모습: 오려낸 병 사진, 원본 사진, 그린 병.
-  late _Look _look = _note.drawn ? _Look.drawn : _Look.photo;
+  late _Look _look = _note.drawn
+      ? _Look.drawn
+      : _note.cutout != null
+      ? _Look.cutout
+      : _Look.photo;
   bool _photoRemoved = false;
   bool _processing = false;
   bool _saving = false;
@@ -122,7 +126,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     setState(() {
       _processing = false;
       _pickedCutout = cutout;
-      _look = _Look.photo;
+      _look = cutout != null ? _Look.cutout : _Look.photo;
       _labelWords = guess.words;
     });
     final parts = [
@@ -247,13 +251,15 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
       if (_pickedPhoto != null) {
         _note.photo = await storage.importPhoto(_pickedPhoto!, _note.id);
         // 그린 병을 골라도 오려낸 사진은 남겨 두어 나중에 다시 바꿀 수 있게
-        _note.cutout = _pickedCutout != null
+        _note.cutout = _pickedCutout != null && _look != _Look.photo
             ? await storage.importBytes(_pickedCutout!, _note.id, '.png')
             : null;
       } else if (_photoRemoved) {
         _note
           ..photo = null
           ..cutout = null;
+      } else if (_look == _Look.photo) {
+        _note.cutout = null;
       }
       _note.drawn = _note.photo != null && _look == _Look.drawn;
       await widget.store.upsert(_note);
@@ -553,7 +559,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   Widget _photoSection() {
     final photo = _photoImage;
     final cutout = _cutoutImage;
-    final showCutout = cutout != null;
+    final showCutout = _look == _Look.cutout && cutout != null;
     return SheetSection(
       title: '병 사진',
       subtitle: 'Photo',
@@ -597,37 +603,55 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            SegmentedButton<_Look>(
-              showSelectedIcon: false,
-              segments: [
-                ButtonSegment(
-                  value: _Look.photo,
-                  icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                  label: Text(tr('병 사진', 'Bottle photo')),
-                ),
-                ButtonSegment(
-                  value: _Look.drawn,
-                  icon: const Icon(Icons.brush_outlined, size: 18),
-                  label: Text(tr('그린 병', 'Drawn')),
-                ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                for (final (look, icon, label) in [
+                  if (cutout != null)
+                    (
+                      _Look.cutout,
+                      Icons.auto_awesome,
+                      tr('병만 (진열장용)', 'Bottle only (cabinet)'),
+                    ),
+                  (
+                    _Look.photo,
+                    Icons.image_outlined,
+                    tr('원본 사진', 'Original photo'),
+                  ),
+                  (
+                    _Look.drawn,
+                    Icons.brush_outlined,
+                    tr('그린 병', 'Drawn bottle'),
+                  ),
+                ])
+                  ChoiceChip(
+                    avatar: Icon(icon, size: 18),
+                    showCheckmark: false,
+                    label: Text(label),
+                    selected:
+                        look ==
+                        (_look == _Look.cutout && cutout == null
+                            ? _Look.photo
+                            : _look),
+                    onSelected: (_) => setState(() => _look = look),
+                  ),
               ],
-              selected: {_look},
-              onSelectionChanged: (v) => setState(() => _look = v.first),
             ),
             Padding(
               padding: const EdgeInsets.only(top: 6, left: 4, right: 4),
               child: Text(switch (_look) {
+                _Look.cutout when cutout != null => tr(
+                  '배경을 지운 실제 병 사진을 진열장에 세웁니다.',
+                  'The real bottle, background removed, stands in your cabinet.',
+                ),
                 _Look.drawn => tr(
                   '사진은 보관하고, 진열장에는 그린 병을 세웁니다.',
                   'Your photo is kept, but the cabinet shows the drawn bottle.',
                 ),
-                _Look.photo when cutout != null => tr(
-                  '배경을 지운 실제 병 사진을 진열장에 세웁니다.',
-                  'The real bottle, background removed, stands in your cabinet.',
-                ),
-                _Look.photo => tr(
-                  '이 사진은 배경을 지우지 못해 진열장에는 사진이 라벨로 붙은 병으로 보여요.',
-                  "The background couldn't be removed, so the cabinet shows the photo as a label.",
+                _ => tr(
+                  '원본 사진을 라벨처럼 붙인 병을 진열장에 세웁니다.',
+                  'The cabinet shows a bottle wearing your photo as its label.',
                 ),
               }, style: const TextStyle(color: NoteColors.hint, fontSize: 12)),
             ),
@@ -712,4 +736,4 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
 }
 
 /// 진열장에 보여줄 병 모습
-enum _Look { photo, drawn }
+enum _Look { cutout, photo, drawn }

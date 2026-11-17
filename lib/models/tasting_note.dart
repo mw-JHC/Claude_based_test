@@ -221,6 +221,7 @@ class TastingNote {
     this.finish = scaleDefault,
     this.overall = '',
     this.emptiedAt,
+    this.emptiedCount = 0,
     this.order = 0,
     List<StoryEntry>? stories,
     DateTime? createdAt,
@@ -301,6 +302,9 @@ class TastingNote {
   DateTime? emptiedAt;
   bool get isEmpty => emptiedAt != null;
 
+  /// 이 이름으로 지금까지 비운 병 수 (같은 병을 여러 번 비우고 합치면 늘어남)
+  int emptiedCount;
+
   /// 이 병과 함께한 이야기들 (날짜별 기록)
   final List<StoryEntry> stories;
 
@@ -340,6 +344,7 @@ class TastingNote {
     'finish': finish,
     'overall': overall,
     'emptiedAt': emptiedAt?.toIso8601String(),
+    'emptiedCount': emptiedCount,
     'order': order,
     'stories': [for (final s in stories) s.toJson()],
     // 색상 값의 범위 버전 (1: 예전 0~2, 2: 지금 0~1)
@@ -399,6 +404,10 @@ class TastingNote {
       finish: (j['finish'] as num?)?.toInt() ?? scaleDefault,
       overall: j['overall'] as String? ?? '',
       emptiedAt: DateTime.tryParse(j['emptiedAt'] as String? ?? ''),
+      // 예전 빈 병 기록에는 개수가 없으니 1병으로 봅니다.
+      emptiedCount:
+          (j['emptiedCount'] as num?)?.toInt() ??
+          (j['emptiedAt'] == null ? 0 : 1),
       order: (j['order'] as num?)?.toInt() ?? 0,
       stories: [
         for (final e in (j['stories'] as List? ?? const []))
@@ -420,3 +429,7 @@ class TastingNote {
         : 0,
   );
 }
+
+/// 같은 위스키인지 비교할 때 쓰는 이름 (대소문자, 앞뒤/겹친 공백 무시)
+String nameKey(String name) =>
+    name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');

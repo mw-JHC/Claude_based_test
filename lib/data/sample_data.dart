@@ -185,15 +185,16 @@ const _samples = <_S>[
     0.60,
   ),
   (
-    'Bruichladdich Classic Laddie',
+    // 같은 병 두 번째: 진열장에 있는 Glenfiddich 12 (비우면 기존 빈 병에 합칠지 물어봄)
+    'Glenfiddich 12',
     WhiskyType.singleMalt,
     WhiskyOrigin.scotland,
-    'Islay',
-    'NAS / Unpeated',
-    50,
-    '€50',
-    81,
-    0.20,
+    'Speyside',
+    '12년 / Bourbon, Sherry',
+    40,
+    '€35',
+    82,
+    0.40,
   ),
   (
     'Talisker 10',
@@ -487,11 +488,13 @@ Future<int> addSampleWhiskies(NoteStore store) async {
   final now = DateTime.now();
   var i = 0;
   // 뒤에서부터 넣어야 진열장에 목록 순서대로 섭니다 (새 병이 맨 앞).
-  for (final s in _samples.reversed) {
+  for (final (index, s) in _samples.indexed.toList().reversed) {
     final (name, type, origin, sub, age, abv, price, score, color) = s;
     final peated = sub == 'Islay' || name.contains('Peat');
     final sherry = age.contains('Sherry') || age.contains('Oloroso');
-    final stories = _emptied[name];
+    // 같은 이름이 둘이면 목록에서 먼저 나온 병만 빈 병으로
+    final firstOfName = _samples.indexWhere((x) => x.$1 == name) == index;
+    final stories = firstOfName ? _emptied[name] : null;
     final created = now.subtract(Duration(days: 30 + i * 9));
     await store.upsert(
       TastingNote(

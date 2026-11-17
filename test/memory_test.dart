@@ -5,6 +5,7 @@ import 'package:whisky_note/data/note_store.dart';
 import 'package:whisky_note/data/sample_data.dart';
 import 'package:whisky_note/models/tasting_note.dart';
 import 'package:whisky_note/screens/note_detail_screen.dart';
+import 'package:whisky_note/screens/note_edit_screen.dart';
 import 'package:whisky_note/screens/stats_screen.dart';
 
 /// 지운 사진을 기억하는 저장소.
@@ -160,7 +161,7 @@ void main() {
     expect(find.text('Japanese'), findsOneWidget);
   });
 
-  testWidgets('순위: 같은 점수는 공동 순위, 1위 → 10위 → 전체로 펼친다', (tester) async {
+  testWidgets('순위: 같은 점수는 공동 순위, 1위 → 10위 → 전체는 새 화면', (tester) async {
     tester.view.physicalSize = const Size(1080, 4000);
     tester.view.devicePixelRatio = 2.5;
     addTearDown(tester.view.reset);
@@ -185,8 +186,13 @@ void main() {
     expect(find.text('4'), findsOneWidget); // 다음은 3위가 아니라 4위
     expect(find.text('W10'), findsNothing); // 11위는 아직 안 보임
 
+    expect(find.text('W9'), findsOneWidget); // 최대 10병
+
+    // 전체 순위는 새 화면에서
     await tester.tap(find.textContaining('전체 12병'));
     await tester.pumpAndSettle();
+    expect(find.byType(RankingScreen), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('W11'), 200);
     expect(find.text('W11'), findsOneWidget);
     expect(find.text('NoScore'), findsNothing); // 점수 없는 병은 순위에서 빠짐
   });
@@ -212,7 +218,114 @@ void main() {
     expect(store.notes.where((n) => n.stories.isNotEmpty), isNotEmpty);
     // 진열장 순서가 샘플 목록 순서
     expect(store.library.first.name, 'Glenfiddich 18');
+    // 같은 이름의 병이 진열장과 Memory Library에 하나씩
+    expect(
+      store.sameName('Glenfiddich 12').map((n) => n.isEmpty),
+      unorderedEquals([true, false]),
+    );
     expect(await removeSampleWhiskies(store), 40);
     expect(store.notes.single.id, 'mine');
+  });
+
+  test('순위 계산: 95, 90, 90, 85 → 1, 2, 2, 4', () {
+    final r = rankByScore([
+      for (final (i, sc) in <double>[90, 85, 95, 90].indexed)
+        TastingNote(id: '$i', name: '$i', score: sc),
+    ]);
+    expect(r.map((e) => e.rank), [1, 2, 2, 4]);
+    expect(r.map((e) => e.tied), [false, true, true, false]);
+  });
+
+  test('같은 이름 빈 병에 합치면 이야기를 날짜순으로 모으고 병 수를 더한다', () async {
+    final storage = TrackingStorage();
+    final store = NoteStore(storage);
+    final old = TastingNote(
+      id: 'old',
+      name: 'Hibiki Harmony',
+      emptiedAt: DateTime(2026, 1, 1),
+      emptiedCount: 1,
+      stories: [StoryEntry(id: 's1', date: DateTime(2025, 12, 1), text: '첫 병')],
+    );
+    final now = TastingNote(
+      id: 'new',
+      name: 'hibiki  harmony ', // 대소문자/공백이 달라도 같은 위스키
+      photo: 'bottle.jpg',
+      overall: '두 번째 병도 좋았다',
+      stories: [
+        StoryEntry(
+          id: 's2',
+          date: DateTime(2026, 3, 1),
+          text: '둘째 병',
+          photos: ['p.jpg'],
+        ),
+      ],
+      createdAt: DateTime(2026, 2, 1),
+    );
+    await store.upsert(old);
+    await store.upsert(now);
+    expect(store.sameName('Hibiki Harmony', except: 'new').single.id, 'old');
+
+    final merged = await store.mergeInto(now, old);
+    expect(store.byId('new'), isNull);
+    expect(merged.emptiedCount, 2);
+    expect(store.emptiedWithName('Hibiki Harmony'), 2);
+    expect(store.emptiedBottles, 2);
+    // 날짜순: 첫 병(12월) → 둘째 병 총평(2월) → 둘째 병 이야기(3월)
+    expect(merged.stories.map((s) => s.text), ['첫 병', '두 번째 병도 좋았다', '둘째 병']);
+    // 이야기 사진은 남기고, 진열장 병 사진만 지움
+    expect(storage.deleted, ['bottle.jpg']);
+  });
+
+  testWidgets('같은 이름을 새로 추가하면 알려 주고, 그래도 추가할 수 있다', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.5;
+    addTearDown(tester.view.reset);
+    final store = NoteStore(MemoryNoteStorage());
+    await store.upsert(TastingNote(id: 'a', name: 'Lagavulin 16'));
+    await tester.pumpWidget(MaterialApp(home: NoteEditScreen(store: store)));
+    await tester.enterText(find.byType(TextField).first, 'lagavulin 16');
+    await tester.tap(find.byTooltip('저장'));
+    await tester.pumpAndSettle();
+    expect(find.text('이미 있는 위스키예요'), findsOneWidget);
+    expect(find.textContaining('진열장에 1병'), findsOneWidget);
+    await tester.tap(find.text('그래도 추가'));
+    await tester.pumpAndSettle();
+    expect(store.library.length, 2);
+  });
+
+  testWidgets('병을 비울 때 같은 이름 빈 병이 있으면 합칠지 묻고, 합친 병 수를 보여준다', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.5;
+    addTearDown(tester.view.reset);
+    final store = NoteStore(MemoryNoteStorage());
+    await store.upsert(
+      TastingNote(
+        id: 'old',
+        name: 'Talisker 10',
+        emptiedAt: DateTime(2026),
+        emptiedCount: 1,
+      ),
+    );
+    await store.upsert(TastingNote(id: 'new', name: 'Talisker 10'));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NoteDetailScreen(store: store, noteId: 'new'),
+      ),
+    );
+    final empty = find.text('병 비우기 (Empty)');
+    await tester.scrollUntilVisible(empty, 300);
+    await tester.ensureVisible(empty);
+    await tester.pumpAndSettle();
+    await tester.tap(empty);
+    await tester.pumpAndSettle();
+    expect(find.text('기존 기록에 합치기'), findsOneWidget);
+    expect(find.text('따로 보관'), findsOneWidget);
+    await tester.tap(find.text('기존 기록에 합치기'));
+    await tester.pumpAndSettle();
+
+    expect(store.byId('new'), isNull);
+    expect(store.memories.single.emptiedCount, 2);
+    // 합친 기록 화면으로 바뀌고, 같은 병 몇 병인지 보인다
+    expect(find.text('같은 병 2병 비움'), findsOneWidget);
   });
 }

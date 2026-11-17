@@ -54,10 +54,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Add Whisky'));
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.widgetWithText(TextField, '이름 / Name *'),
-      'Lagavulin 16',
-    );
+    await tester.enterText(find.byType(TextField).first, 'Lagavulin 16');
     await tester.tap(find.text('Single Malt'));
     await tester.tap(find.byTooltip('저장'));
     await tester.pumpAndSettle();

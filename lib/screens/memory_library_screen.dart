@@ -58,7 +58,7 @@ class MemoryLibraryScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '비운 병 ${memories.length}  ·  이야기 $stories',
+                              '비운 병 ${store.emptiedBottles}  ·  이야기 $stories',
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: NoteColors.hint,

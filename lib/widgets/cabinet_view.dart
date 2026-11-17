@@ -1425,7 +1425,10 @@ class _Plaque extends StatelessWidget {
 String? _badge(TastingNote n) {
   final e = n.emptiedAt;
   if (e != null) {
-    return '${e.year % 100}.${e.month.toString().padLeft(2, '0')}.${e.day.toString().padLeft(2, '0')}';
+    final date =
+        '${e.year % 100}.${e.month.toString().padLeft(2, '0')}.${e.day.toString().padLeft(2, '0')}';
+    // 같은 병을 여러 번 비워 합친 기록은 병 수도 함께
+    return n.emptiedCount > 1 ? '$date ×${n.emptiedCount}' : date;
   }
   return n.score == null ? null : _fmt(n.score!);
 }

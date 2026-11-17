@@ -78,7 +78,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
             final style = widget.settings.cabinetStyle;
             // 비운 병은 Memory Library로 갑니다.
             final all = store.library;
-            final memoryCount = store.memories.length;
+            final memoryCount = store.emptiedBottles;
             final notes = all.where(_matches).toList();
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -150,32 +150,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
       child: Row(
         children: [
-          // 새 병 추가: 늘 제목 옆 같은 자리에
-          Tooltip(
-            message: 'Add Whisky',
-            child: Semantics(
-              button: true,
-              label: 'Add Whisky',
-              child: Material(
-                shape: const CircleBorder(),
-                clipBehavior: Clip.antiAlias,
-                child: Ink(
-                  decoration: const BoxDecoration(
-                    gradient: NoteColors.accentGradient,
-                  ),
-                  child: InkWell(
-                    onTap: _add,
-                    child: const SizedBox(
-                      width: 48,
-                      height: 48,
-                      child: Icon(Icons.add, color: NoteColors.ink, size: 26),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,6 +176,32 @@ class _NoteListScreenState extends State<NoteListScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // 새 병 추가: 제목 오른쪽 (왼쪽 위는 보통 '뒤로' 자리라 피함)
+          Tooltip(
+            message: 'Add Whisky',
+            child: Semantics(
+              button: true,
+              label: 'Add Whisky',
+              child: Material(
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: Ink(
+                  decoration: const BoxDecoration(
+                    gradient: NoteColors.accentGradient,
+                  ),
+                  child: InkWell(
+                    onTap: _add,
+                    child: const SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Icon(Icons.add, color: NoteColors.ink, size: 26),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ],

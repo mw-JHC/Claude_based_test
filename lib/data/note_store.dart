@@ -146,6 +146,67 @@ class NoteStore extends ChangeNotifier {
       _notes.where((n) => n.isEmpty).toList()
         ..sort((a, b) => b.emptiedAt!.compareTo(a.emptiedAt!));
 
+  /// Memory Library에 있는 빈 병 수 (합쳐진 기록은 그만큼 셉니다)
+  int get emptiedBottles =>
+      memories.fold(0, (sum, n) => sum + math.max(1, n.emptiedCount));
+
+  /// [name]과 같은 이름의 노트들 ([except]는 빼고)
+  List<TastingNote> sameName(String name, {String? except}) {
+    final key = nameKey(name);
+    return notes
+        .where((n) => n.id != except && nameKey(n.name) == key)
+        .toList();
+  }
+
+  /// 같은 이름으로 비운 병이 모두 몇 병인지
+  int emptiedWithName(String name) =>
+      sameName(name)
+          .where((n) => n.isEmpty)
+          .fold(0, (s, n) => s + math.max(1, n.emptiedCount));
+
+  /// 병 비우기: Memory Library로 옮기고 비운 병 수를 하나 늘립니다.
+  Future<void> empty(TastingNote note) async {
+    await upsert(
+      note.copy()
+        ..emptiedAt = DateTime.now()
+        ..emptiedCount = note.emptiedCount + 1,
+    );
+  }
+
+  /// 다시 진열장에 놓기 (비운 기록 수는 그대로 남깁니다)
+  Future<void> restore(TastingNote note) async {
+    await upsert(note.copy()..emptiedAt = null);
+  }
+
+  /// 병을 비우면서 같은 이름의 기존 빈 병 기록에 합칩니다.
+  /// 이야기는 날짜순으로 합치고, 총평은 그날의 이야기로 남기고, 병 수를 더합니다.
+  /// 합쳐진 기록을 돌려줍니다.
+  Future<TastingNote> mergeInto(TastingNote source, TastingNote target) async {
+    final merged = target.copy()
+      ..emptiedAt = DateTime.now()
+      ..emptiedCount =
+          math.max(1, target.emptiedCount) + source.emptiedCount + 1;
+    merged.stories.addAll(source.stories.map((s) => s.copy()));
+    if (source.overall.isNotEmpty) {
+      merged.stories.add(
+        StoryEntry(
+          id: 'merged-${source.id}',
+          date: source.createdAt,
+          text: source.overall,
+        ),
+      );
+    }
+    merged.stories.sort((a, b) => a.date.compareTo(b.date));
+    // 원래 병 노트는 지우되, 합친 기록이 쓰는 사진은 남깁니다.
+    final keep = merged.files;
+    _notes.removeWhere((n) => n.id == source.id);
+    await upsert(merged);
+    for (final name in source.files.difference(keep)) {
+      await storage.deletePhoto(name);
+    }
+    return merged;
+  }
+
   TastingNote? byId(String id) {
     for (final n in _notes) {
       if (n.id == id) return n;

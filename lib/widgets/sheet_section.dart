@@ -233,3 +233,83 @@ class SelectPill extends StatelessWidget {
     );
   }
 }
+
+/// 한글-영어 함께 쓰는 이름표: 한글은 하얀 굵은 글씨, 영어는 옆(또는 아래)에
+/// 흐린 이탤릭 세리프. 예) **도수** _ABV_
+class BiLabel extends StatelessWidget {
+  const BiLabel(
+    this.ko,
+    this.en, {
+    super.key,
+    this.size = 13,
+    this.stacked = false,
+    this.center = false,
+  });
+
+  final String ko;
+  final String en;
+
+  /// 한글 글자 크기 (영어는 조금 작게)
+  final double size;
+
+  /// true면 영어를 한글 아래 줄에
+  final bool stacked;
+  final bool center;
+
+  @override
+  Widget build(BuildContext context) {
+    final koText = Text(
+      ko,
+      style: TextStyle(
+        fontSize: size,
+        fontWeight: FontWeight.w700,
+        color: NoteColors.text,
+      ),
+    );
+    final enText = Text(
+      en,
+      style: TextStyle(
+        fontFamily: serif,
+        fontStyle: FontStyle.italic,
+        fontSize: size * 0.85,
+        color: NoteColors.hint,
+      ),
+    );
+    if (stacked) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: center
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
+        children: [koText, enText],
+      );
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        koText,
+        SizedBox(width: size * 0.4),
+        enText,
+      ],
+    );
+  }
+}
+
+/// 입력칸 이름표: 한글 뒤에 이탤릭 영어. 색은 입력칸 상태(흐림/강조)를 따릅니다.
+Widget inputLabel(String ko, String en) => Text.rich(
+  TextSpan(
+    text: ko,
+    children: [
+      TextSpan(
+        text: '  $en',
+        style: const TextStyle(
+          fontFamily: serif,
+          fontStyle: FontStyle.italic,
+          fontSize: 13,
+        ),
+      ),
+    ],
+  ),
+);

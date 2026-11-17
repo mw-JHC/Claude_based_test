@@ -168,12 +168,48 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  /// 같은 이름의 병이 이미 있으면 true(그래도 추가) / false(취소)를 묻습니다.
+  Future<bool> _confirmDuplicate() async {
+    final same = widget.store.sameName(_name.text);
+    if (same.isEmpty) return true;
+    final onShelf = same.where((n) => !n.isEmpty).length;
+    final emptied = widget.store.emptiedWithName(_name.text);
+    final where = [
+      if (onShelf > 0) '진열장에 $onShelf병',
+      if (emptied > 0) 'Memory Library에 빈 병 $emptied병',
+    ].join(', ');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('이미 있는 위스키예요'),
+        content: Text(
+          '"${_name.text.trim()}"이(가) $where 있어요.\n'
+          '같은 병을 하나 더 진열장에 놓을까요?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('그래도 추가'),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
   Future<void> _save() async {
     if (_name.text.trim().isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('위스키 이름을 입력해 주세요.')));
       return;
     }
+    // 새로 추가하는데 같은 이름이 이미 있으면 알려 주고, 그래도 추가할지 묻습니다.
+    if (widget.original == null && !await _confirmDuplicate()) return;
+    if (!mounted) return;
     setState(() => _saving = true);
     _note
       ..name = _name.text.trim()
@@ -347,8 +383,10 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   Widget _basicInfo() {
     Widget field(
       TextEditingController c,
-      String label, {
+      String ko,
+      String en, {
       String? suffix,
+      String? hint,
       bool number = false,
     }) => Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -357,7 +395,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
         keyboardType: number
             ? const TextInputType.numberWithOptions(decimal: true)
             : TextInputType.text,
-        decoration: InputDecoration(labelText: label, suffixText: suffix),
+        decoration: InputDecoration(
+          label: inputLabel(ko, en),
+          suffixText: suffix,
+          hintText: hint,
+        ),
       ),
     );
 
@@ -367,12 +409,9 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          field(_name, '이름 / Name *'),
+          field(_name, '이름 *', 'Name'),
           if (_labelWords.isNotEmpty) _labelWordChips(),
-          const Text(
-            '종류',
-            style: TextStyle(fontSize: 12, color: NoteColors.hint),
-          ),
+          const BiLabel('종류', 'Type', size: 13),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
@@ -398,22 +437,25 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
             }),
           ),
           const SizedBox(height: 16),
-          field(_ageCask, '숙성연도 / 캐스크'),
+          field(_ageCask, '숙성 · 캐스크', 'Age · Cask'),
           Row(
             children: [
-              Expanded(child: field(_abv, '도수 ABV', suffix: '%', number: true)),
+              Expanded(
+                child: field(_abv, '도수', 'ABV', suffix: '%', number: true),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: field(
                   _score,
-                  '점수 / Score',
+                  '점수',
+                  'Score',
                   suffix: '/ 100',
                   number: true,
                 ),
               ),
             ],
           ),
-          field(_price, '가격 / Price (예: €65 / 70cl)'),
+          field(_price, '가격', 'Price', hint: '예: €65 / 70cl'),
         ],
       ),
     );

@@ -195,9 +195,9 @@ class _StoryEditScreenState extends State<StoryEditScreen> {
                 const SizedBox(height: 10),
                 TextField(
                   controller: _with,
-                  decoration: const InputDecoration(
-                    labelText: '함께한 사람',
-                    prefixIcon: Icon(Icons.people_outline, size: 20),
+                  decoration: InputDecoration(
+                    label: inputLabel('함께한 사람', 'With'),
+                    prefixIcon: const Icon(Icons.people_outline, size: 20),
                   ),
                 ),
                 const SizedBox(height: 10),

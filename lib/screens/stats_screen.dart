@@ -19,7 +19,7 @@ class StatsScreen extends StatefulWidget {
 enum _Scope { library, memory, total }
 
 /// 점수 순위 펼침 정도: 1위만 / 10위까지 / 전부
-enum _RankView { top1, top10, all }
+enum _RankView { top1, top10 }
 
 class _StatsScreenState extends State<StatsScreen> {
   _Scope _scope = _Scope.library;
@@ -62,14 +62,19 @@ class _StatsScreenState extends State<StatsScreen> {
             children: [
               Row(
                 children: [
-                  _Tile(label: '진열 중', value: '${library.length}'),
-                  const SizedBox(width: 8),
-                  _Tile(label: '비운 병', value: '${memories.length}'),
-                  const SizedBox(width: 8),
-                  _Tile(label: '이야기', value: '$stories'),
+                  _Tile(ko: '진열 중', en: 'Cabinet', value: '${library.length}'),
                   const SizedBox(width: 8),
                   _Tile(
-                    label: '평균 점수',
+                    ko: '비운 병',
+                    en: 'Emptied',
+                    value: '${store.emptiedBottles}',
+                  ),
+                  const SizedBox(width: 8),
+                  _Tile(ko: '이야기', en: 'Stories', value: '$stories'),
+                  const SizedBox(width: 8),
+                  _Tile(
+                    ko: '평균 점수',
+                    en: 'Average',
                     value: avg == null ? '–' : avg.toStringAsFixed(0),
                   ),
                 ],
@@ -92,15 +97,15 @@ class _StatsScreenState extends State<StatsScreen> {
               ),
               const SizedBox(height: 14),
               _Collapsible(
-                title: 'Origins',
-                subtitle: '산지',
+                title: '생산지',
+                subtitle: 'Origins',
                 open: _originsOpen,
                 onToggle: () => setState(() => _originsOpen = !_originsOpen),
                 bars: _byOrigin(scope),
               ),
               _Collapsible(
-                title: 'Type',
-                subtitle: '종류',
+                title: '종류',
+                subtitle: 'Type',
                 open: _typesOpen,
                 onToggle: () => setState(() => _typesOpen = !_typesOpen),
                 bars: _byType(scope),
@@ -112,23 +117,18 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
-  /// 점수 순위. 같은 점수는 같은 순위 (1, 2, 2, 4 …).
+  /// 점수 순위 칸: 처음엔 1위만, ▼로 10위까지, 그 이상은 새 화면에서.
   Widget _ranking(List<TastingNote> scored, int total) {
-    final ranked = [...scored]..sort((a, b) => b.score!.compareTo(a.score!));
-    final ranks = [
-      for (final n in ranked)
-        1 + ranked.where((o) => o.score! > n.score!).length,
-    ];
+    final ranking = rankByScore(scored);
     final shown = switch (_rank) {
-      _RankView.top1 => ranked.isEmpty ? 0 : ranks.where((r) => r == 1).length,
-      _RankView.top10 => ranks.where((r) => r <= 10).length,
-      _RankView.all => ranked.length,
+      _RankView.top1 => ranking.where((r) => r.rank == 1).length,
+      // 10위 안에 공동 순위가 겹쳐도 최대 10병만
+      _RankView.top10 => ranking.length < 10 ? ranking.length : 10,
     };
-    final canExpand = shown < ranked.length;
     return SheetSection(
       title: '최고 점수',
       subtitle: 'Top rated',
-      trailing: ranked.isEmpty
+      trailing: ranking.length <= 1
           ? null
           : IconButton(
               tooltip: _rank == _RankView.top1 ? '10위까지 보기' : '접기',
@@ -144,7 +144,7 @@ class _StatsScreenState extends State<StatsScreen> {
                 child: const Icon(Icons.keyboard_arrow_down),
               ),
             ),
-      child: ranked.isEmpty
+      child: ranking.isEmpty
           ? const Text(
               '점수를 매긴 위스키가 없어요.',
               style: TextStyle(color: NoteColors.hint),
@@ -154,23 +154,24 @@ class _StatsScreenState extends State<StatsScreen> {
               curve: Curves.easeOutCubic,
               alignment: Alignment.topCenter,
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (var i = 0; i < shown; i++)
-                    _RankRow(
-                      rank: ranks[i],
-                      tied: ranks.where((r) => r == ranks[i]).length > 1,
-                      note: ranked[i],
-                    ),
-                  if (_rank == _RankView.top10 && canExpand)
+                  for (final r in ranking.take(shown)) _RankRow(entry: r),
+                  if (_rank == _RankView.top10 && ranking.length > shown)
                     TextButton(
-                      onPressed: () => setState(() => _rank = _RankView.all),
-                      child: Text('…  전체 ${ranked.length}병 순위 보기'),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => RankingScreen(store: widget.store),
+                        ),
+                      ),
+                      child: Text('…  전체 ${ranking.length}병 순위 보기'),
                     ),
-                  if (_rank != _RankView.top1 && scored.length < total)
+                  if (_rank == _RankView.top10 && scored.length < total)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
                         '점수 없는 ${total - scored.length}병은 순위에서 빠졌어요',
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontSize: 11.5,
                           color: NoteColors.faint,
@@ -192,35 +193,42 @@ class _StatsScreenState extends State<StatsScreen> {
       final subs = <String, int>{};
       for (final n in group) {
         if (n.subRegion.isNotEmpty) {
-          subs[n.subRegion] = (subs[n.subRegion] ?? 0) + 1;
+          subs[n.subRegion] = (subs[n.subRegion] ?? 0) + _bottles([n]);
         }
       }
       final detail =
           (subs.entries.toList()..sort((a, b) => b.value.compareTo(a.value)))
               .map((e) => '${e.key} ${e.value}')
               .join(' · ');
-      bars.add(_Bar(o.label, group.length, detail));
+      bars.add(_Bar(o.label, _bottles(group), detail));
     }
-    final unknown = notes.where((n) => n.origin == null).length;
+    final unknown = _bottles(notes.where((n) => n.origin == null));
     if (unknown > 0) bars.add(_Bar('미입력', unknown, ''));
     return bars..sort((a, b) => b.count.compareTo(a.count));
   }
 
+  /// 병 수: 합쳐진 빈 병 기록은 그 안의 병 수만큼 셉니다.
+  static int _bottles(Iterable<TastingNote> notes) => notes.fold(
+    0,
+    (sum, n) => sum + (n.isEmpty && n.emptiedCount > 1 ? n.emptiedCount : 1),
+  );
+
   List<_Bar> _byType(List<TastingNote> notes) {
     final bars = [
       for (final t in WhiskyType.values)
-        _Bar(t.label, notes.where((n) => n.type == t).length, ''),
+        _Bar(t.label, _bottles(notes.where((n) => n.type == t)), ''),
     ].where((b) => b.count > 0).toList();
-    final unknown = notes.where((n) => n.type == null).length;
+    final unknown = _bottles(notes.where((n) => n.type == null));
     if (unknown > 0) bars.add(_Bar('미입력', unknown, ''));
     return bars..sort((a, b) => b.count.compareTo(a.count));
   }
 }
 
 class _Tile extends StatelessWidget {
-  const _Tile({required this.label, required this.value});
+  const _Tile({required this.ko, required this.en, required this.value});
 
-  final String label;
+  final String ko;
+  final String en;
   final String value;
 
   @override
@@ -243,11 +251,8 @@ class _Tile extends StatelessWidget {
               color: NoteColors.text,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 11.5, color: NoteColors.hint),
-          ),
+          const SizedBox(height: 4),
+          BiLabel(ko, en, size: 12, stacked: true, center: true),
         ],
       ),
     ),
@@ -346,16 +351,15 @@ class _Bars extends StatelessWidget {
 }
 
 class _RankRow extends StatelessWidget {
-  const _RankRow({required this.rank, required this.note, this.tied = false});
+  const _RankRow({required this.entry});
 
-  final int rank;
-
-  /// 같은 점수의 병이 더 있으면 "공동"
-  final bool tied;
-  final TastingNote note;
+  final RankEntry entry;
 
   @override
   Widget build(BuildContext context) {
+    final rank = entry.rank;
+    final tied = entry.tied;
+    final note = entry.note;
     final s = note.score!;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -464,23 +468,7 @@ class _Collapsible extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
               child: Row(
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontFamily: serif,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: NoteColors.text,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: NoteColors.hint,
-                    ),
-                  ),
+                  BiLabel(title, subtitle, size: 16),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -518,6 +506,96 @@ class _Collapsible extends StatelessWidget {
                 : const SizedBox(width: double.infinity),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 순위 한 줄: 순위, 공동 여부, 위스키
+class RankEntry {
+  const RankEntry(this.rank, this.tied, this.note);
+  final int rank;
+
+  /// 같은 점수의 병이 더 있으면 true ("공동")
+  final bool tied;
+  final TastingNote note;
+}
+
+/// 점수 높은 순 순위. 같은 점수는 같은 순위이고 다음 순위는 그만큼 건너뜁니다
+/// (95, 90, 90, 85 → 1, 2, 2, 4). 점수 없는 병은 빠집니다.
+List<RankEntry> rankByScore(Iterable<TastingNote> notes) {
+  final scored = notes.where((n) => n.score != null).toList()
+    ..sort((a, b) => b.score!.compareTo(a.score!));
+  final counts = <double, int>{};
+  for (final n in scored) {
+    counts[n.score!] = (counts[n.score!] ?? 0) + 1;
+  }
+  return [
+    for (final (i, n) in scored.indexed)
+      RankEntry(
+        // 앞에 있는 더 높은 점수 병 수 + 1
+        i == 0 || scored[i - 1].score! != n.score!
+            ? i + 1
+            : 1 + scored.indexWhere((o) => o.score! == n.score!),
+        counts[n.score!]! > 1,
+        n,
+      ),
+  ];
+}
+
+/// 등록된 모든 위스키의 점수 순위 (진열장 + 빈 병). 병이 많아도 스크롤로 봅니다.
+class RankingScreen extends StatelessWidget {
+  const RankingScreen({super.key, required this.store});
+
+  final NoteStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Ranking')),
+      body: ListenableBuilder(
+        listenable: store,
+        builder: (context, _) {
+          final all = store.notes;
+          final ranking = rankByScore(all);
+          final unscored = all.length - ranking.length;
+          return ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+            itemCount: ranking.length + 1,
+            itemBuilder: (context, i) {
+              if (i == 0) {
+                // 제목과 병 수 (좁은 화면에서도 넘치지 않게 두 줄)
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const BiLabel('전체 순위', 'All whiskies', size: 16),
+                      const SizedBox(height: 4),
+                      Text(
+                        unscored > 0
+                            ? '${ranking.length}병 · 점수 없음 $unscored병'
+                            : '${ranking.length}병',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: NoteColors.hint,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return Container(
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: NoteColors.line, width: 0.5),
+                  ),
+                ),
+                child: _RankRow(entry: ranking[i - 1]),
+              );
+            },
+          );
+        },
       ),
     );
   }

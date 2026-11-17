@@ -1,7 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../models/tasting_note.dart';
-import '../theme.dart';
 import 'sheet_section.dart';
 
 /// 산지 고르기: 먼저 나라, 그 아래에 그 나라의 세부 지역이 나옵니다.
@@ -48,10 +47,7 @@ class _OriginPickerState extends State<OriginPicker> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          '산지',
-          style: TextStyle(fontSize: 12, color: NoteColors.hint),
-        ),
+        const BiLabel('생산지', 'Origin', size: 13),
         const SizedBox(height: 6),
         Wrap(
           spacing: 6,
@@ -68,10 +64,9 @@ class _OriginPickerState extends State<OriginPicker> {
         ),
         if (origin != null && origin.subRegions.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Text(
-            origin == WhiskyOrigin.american ? '스타일' : '세부 지역',
-            style: const TextStyle(fontSize: 12, color: NoteColors.hint),
-          ),
+          origin == WhiskyOrigin.american
+              ? const BiLabel('스타일', 'Style', size: 13)
+              : const BiLabel('세부 지역', 'Region', size: 13),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
@@ -93,8 +88,9 @@ class _OriginPickerState extends State<OriginPicker> {
           TextField(
             controller: _country,
             textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              labelText: '나라 (예: Germany, India)',
+            decoration: InputDecoration(
+              label: inputLabel('나라', 'Country'),
+              hintText: '예: Germany, India',
             ),
             onChanged: (v) => widget.onChanged(origin, v.trim()),
           ),

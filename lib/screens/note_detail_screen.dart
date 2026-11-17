@@ -188,38 +188,73 @@ class NoteDetailScreen extends StatelessWidget {
   }
 
   Future<void> _toggleEmpty(BuildContext context, TastingNote note) async {
-    final empty = note.isEmpty;
-    if (!empty) {
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (c) => AlertDialog(
-          title: const Text('병을 비울까요?'),
-          content: const Text(
-            '진열장에서 Memory Library로 옮겨집니다.\n노트와 이야기는 그대로 남아요.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(c, false),
-              child: const Text('취소'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(c, true),
-              child: const Text('비우기'),
-            ),
-          ],
-        ),
-      );
-      if (ok != true) return;
+    void snack(String text) =>
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(text)));
+
+    if (note.isEmpty) {
+      await store.restore(note);
+      if (context.mounted) snack('진열장에 다시 놓았어요.');
+      return;
     }
-    final updated = note.copy()..emptiedAt = empty ? null : DateTime.now();
-    await store.upsert(updated);
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+
+    // 같은 이름으로 이미 비운 병이 있으면, 그 기록에 합칠지 물어봅니다.
+    final previous = store
+        .sameName(note.name, except: note.id)
+        .where((n) => n.isEmpty)
+        .toList();
+    final choice = await showDialog<_EmptyChoice>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('병을 비울까요?'),
         content: Text(
-          empty ? '진열장에 다시 놓았어요.' : 'Memory Library로 옮겼어요. 고마웠어, ${note.name}!',
+          previous.isEmpty
+              ? '진열장에서 Memory Library로 옮겨집니다.\n노트와 이야기는 그대로 남아요.'
+              : 'Memory Library에 이미 "${note.name}" 빈 병이 '
+                    '${store.emptiedWithName(note.name)}병 있어요.\n\n'
+                    '기존 빈 병 기록에 합치면 이야기를 날짜순으로 함께 모으고 '
+                    '비운 병 수를 하나 늘립니다.',
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('취소'),
+          ),
+          if (previous.isNotEmpty)
+            TextButton(
+              onPressed: () => Navigator.pop(c, _EmptyChoice.separate),
+              child: const Text('따로 보관'),
+            ),
+          FilledButton(
+            onPressed: () => Navigator.pop(
+              c,
+              previous.isEmpty ? _EmptyChoice.separate : _EmptyChoice.merge,
+            ),
+            child: Text(previous.isEmpty ? '비우기' : '기존 기록에 합치기'),
+          ),
+        ],
       ),
+    );
+    if (choice == null || !context.mounted) return;
+
+    if (choice == _EmptyChoice.separate) {
+      await store.empty(note);
+      if (context.mounted) {
+        snack('Memory Library로 옮겼어요. 고마웠어, ${note.name}!');
+      }
+      return;
+    }
+    // 합치면 이 노트는 기존 빈 병 기록으로 들어가므로, 그 기록 화면으로 바꿉니다.
+    final merged = await store.mergeInto(note, previous.first);
+    if (!context.mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => NoteDetailScreen(store: store, noteId: merged.id),
+      ),
+    );
+    snack(
+      '기존 빈 병 기록에 합쳤어요. "${note.name}" 빈 병 '
+      '${store.emptiedWithName(note.name)}병',
     );
   }
 
@@ -247,6 +282,9 @@ class NoteDetailScreen extends StatelessWidget {
       if (note.ageCask.isNotEmpty) (Icons.hourglass_bottom, note.ageCask),
       if (note.emptiedAt != null)
         (Icons.auto_stories_outlined, '빈 병 · ${_date(note.emptiedAt!)}'),
+      // 같은 이름으로 비운 병이 여러 병이면 모두 몇 병인지
+      if (note.isEmpty && store.emptiedWithName(note.name) > 1)
+        (Icons.layers_outlined, '같은 병 ${store.emptiedWithName(note.name)}병 비움'),
     ];
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,14 +322,7 @@ class NoteDetailScreen extends StatelessWidget {
           children: [
             ScoreRing(score: note.score, size: 70),
             const SizedBox(height: 4),
-            const Text(
-              'SCORE',
-              style: TextStyle(
-                fontSize: 10,
-                letterSpacing: 1.5,
-                color: NoteColors.hint,
-              ),
-            ),
+            const BiLabel('점수', 'Score', size: 12),
           ],
         ),
       ],
@@ -301,7 +332,7 @@ class NoteDetailScreen extends StatelessWidget {
   Widget _stats(TastingNote note) {
     String? num(double? v, String unit) =>
         v == null ? null : '${v == v.roundToDouble() ? v.toInt() : v}$unit';
-    Widget tile(String label, Widget value) => Expanded(
+    Widget tile(String ko, String en, Widget value) => Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
@@ -312,10 +343,7 @@ class NoteDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: const TextStyle(fontSize: 11, color: NoteColors.hint),
-            ),
+            BiLabel(ko, en, size: 12),
             const SizedBox(height: 6),
             value,
           ],
@@ -335,12 +363,13 @@ class NoteDetailScreen extends StatelessWidget {
     );
     return Row(
       children: [
-        tile('도수', v(num(note.abv, '%'))),
+        tile('도수', 'ABV', v(num(note.abv, '%'))),
         const SizedBox(width: 8),
-        tile('가격', v(note.price)),
+        tile('가격', 'Price', v(note.price)),
         const SizedBox(width: 8),
         tile(
           '색상',
+          'Color',
           note.color == null
               ? v(null)
               : Row(
@@ -728,3 +757,5 @@ class _StoryCard extends StatelessWidget {
     );
   }
 }
+
+enum _EmptyChoice { separate, merge }

@@ -80,6 +80,9 @@ class _CabinetViewState extends State<CabinetView> {
 
   bool get _animateMoves => _dragId != null || _settling;
 
+  /// 빈 병(Memory Library)은 이름표를 두 줄(이름 / 비운 날)로 씁니다.
+  bool get _twoLine => widget.notes.any((n) => n.isEmpty);
+
   @override
   void dispose() {
     _settleTimer?.cancel();
@@ -106,9 +109,11 @@ class _CabinetViewState extends State<CabinetView> {
     final perRow = widget.style == CabinetStyle.museum
         ? 2
         : math.max(2, ((size.width - 64) / slot).floor());
+    // 두 줄 이름표 자리만큼 선반이 조금 높아집니다.
+    final extra = _twoLine && widget.style != CabinetStyle.museum ? 14.0 : 0.0;
     final usable = size.height - overhead;
     final rows = math.max(1, (usable / minShelf).floor());
-    final bottle = (usable / rows - fixed).clamp(minBottle, maxBottle);
+    final bottle = (usable / rows - fixed - extra).clamp(minBottle, maxBottle);
     return _Layout(perRow, rows, bottle);
   }
 
@@ -435,6 +440,7 @@ class _CabinetViewState extends State<CabinetView> {
             for (final (base, row) in rows)
               Expanded(
                 child: _WoodShelf(
+                  twoLine: _twoLine,
                   slots: layout.perRow,
                   tilt: tilt,
                   notes: row,
@@ -483,6 +489,7 @@ class _CabinetViewState extends State<CabinetView> {
             for (final (base, row) in rows)
               Expanded(
                 child: _BarShelf(
+                  twoLine: _twoLine,
                   slots: layout.perRow,
                   tilt: tilt,
                   notes: row,
@@ -695,6 +702,7 @@ class _FlipState extends State<_Flip> with SingleTickerProviderStateMixin {
 
 class _WoodShelf extends StatelessWidget {
   const _WoodShelf({
+    this.twoLine = false,
     required this.slots,
     required this.tilt,
     required this.notes,
@@ -702,8 +710,10 @@ class _WoodShelf extends StatelessWidget {
     required this.emptySlot,
   });
 
-  static const board = 40.0;
+  /// 선반 판 높이 (두 줄 이름표면 더 높게)
+  double get board => twoLine ? 54 : 40;
 
+  final bool twoLine;
   final int slots;
   final double tilt;
   final List<TastingNote> notes;
@@ -774,8 +784,8 @@ class _WoodShelf extends StatelessWidget {
           Positioned(
             left: 12 + parallax * 0.6,
             right: 12 - parallax * 0.6,
-            bottom: 6,
-            height: 20,
+            bottom: twoLine ? 5 : 6,
+            height: twoLine ? 36 : 20,
             child: _slotRow(slots, notes, (n) => _BrassPlate(note: n)),
           ),
         ],
@@ -921,8 +931,11 @@ class _BrassPlate extends StatelessWidget {
       color: Color(0xFF2A1A0A),
     );
     return Container(
-      constraints: const BoxConstraints(maxWidth: 80),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      constraints: const BoxConstraints(maxWidth: 84),
+      padding: EdgeInsets.symmetric(
+        horizontal: 5,
+        vertical: note.isEmpty ? 3 : 0,
+      ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(2),
         gradient: const LinearGradient(
@@ -935,25 +948,47 @@ class _BrassPlate extends StatelessWidget {
         ],
       ),
       alignment: Alignment.center,
-      // 이름이 길어도 점수는 잘리지 않도록 따로 둡니다.
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(
-              note.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: style,
+      child: note.isEmpty
+          // 빈 병: 위에 이름, 아래에 비운 날 (이름이 길면 …)
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  note.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: style.copyWith(fontSize: 10.5),
+                ),
+                if (badge != null)
+                  Text(
+                    badge,
+                    maxLines: 1,
+                    style: style.copyWith(
+                      fontSize: 9.5,
+                      color: const Color(0xFF7A1E0A),
+                    ),
+                  ),
+              ],
+            )
+          // 이름이 길어도 점수는 잘리지 않도록 따로 둡니다.
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    note.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: style,
+                  ),
+                ),
+                if (badge != null)
+                  Text(
+                    ' · $badge',
+                    style: style.copyWith(color: const Color(0xFF7A1E0A)),
+                  ),
+              ],
             ),
-          ),
-          if (badge != null)
-            Text(
-              ' · $badge',
-              style: style.copyWith(color: const Color(0xFF7A1E0A)),
-            ),
-        ],
-      ),
     );
   }
 }
@@ -962,6 +997,7 @@ class _BrassPlate extends StatelessWidget {
 
 class _BarShelf extends StatelessWidget {
   const _BarShelf({
+    this.twoLine = false,
     required this.slots,
     required this.tilt,
     required this.notes,
@@ -971,6 +1007,10 @@ class _BarShelf extends StatelessWidget {
 
   static const glass = 30.0;
 
+  /// 선반 아래 이름 자리 높이 (두 줄 이름표면 더 높게)
+  double get names => twoLine ? 28 : 14;
+
+  final bool twoLine;
   final int slots;
   final double tilt;
   final List<TastingNote> notes;
@@ -1052,7 +1092,7 @@ class _BarShelf extends StatelessWidget {
           Positioned(
             left: 0,
             right: 0,
-            bottom: 14,
+            bottom: names,
             height: glass - 14,
             child: CustomPaint(painter: _GlassShelfPainter()),
           ),
@@ -1060,7 +1100,7 @@ class _BarShelf extends StatelessWidget {
           Positioned(
             left: 12 + parallax,
             right: 12 - parallax,
-            bottom: 14,
+            bottom: names,
             child: _slotRow(
               slots,
               notes,
@@ -1074,20 +1114,48 @@ class _BarShelf extends StatelessWidget {
             left: 12 + parallax * 0.8,
             right: 12 - parallax * 0.8,
             bottom: 0,
-            height: 14,
+            height: names,
             child: _slotRow(
               slots,
               notes,
-              (n) => Text(
-                [n.name, ?_badge(n)].join(' · '),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 9,
-                  letterSpacing: 0.3,
-                  color: Color(0xFFE9D6B0),
-                ),
-              ),
+              (n) => n.isEmpty
+                  // 빈 병: 위에 이름, 아래에 비운 날 (옆 이름과 붙지 않게 여백)
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            n.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFE9D6B0),
+                            ),
+                          ),
+                          Text(
+                            _badge(n) ?? '',
+                            maxLines: 1,
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              color: NoteColors.gold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Text(
+                      [n.name, ?_badge(n)].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 9,
+                        letterSpacing: 0.3,
+                        color: Color(0xFFE9D6B0),
+                      ),
+                    ),
             ),
           ),
         ],
@@ -1408,10 +1476,15 @@ class _Plaque extends StatelessWidget {
             ),
           ),
           Text(
-            [sub, ?_badge(note)].where((s) => s.isNotEmpty).join('  ·  '),
+            note.isEmpty
+                ? _badge(note)!
+                : [sub, ?_badge(note)].where((s) => s.isNotEmpty).join('  ·  '),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFF9A8F7C), fontSize: 10.5),
+            style: TextStyle(
+              color: note.isEmpty ? NoteColors.gold : const Color(0xFF9A8F7C),
+              fontSize: note.isEmpty ? 11.5 : 10.5,
+            ),
           ),
         ],
       ),

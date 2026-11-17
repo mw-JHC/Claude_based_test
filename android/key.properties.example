@@ -1,0 +1,6 @@
+# 이 파일을 key.properties 로 복사하고 값을 채우세요. (key.properties 는 git에 올라가지 않습니다)
+# 키 만드는 법은 RELEASE.md 참고.
+storePassword=키스토어_비밀번호
+keyPassword=키_비밀번호
+keyAlias=upload
+storeFile=C:/Users/내이름/whisky-library-upload.jks

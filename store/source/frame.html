@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700&display=swap" rel="stylesheet">
+<style>
+@font-face { font-family: Playfair; src: url(PlayfairDisplay-Bold.ttf); font-weight: 700; }
+html,body{margin:0;width:1080px;height:1920px;overflow:hidden}
+body{background:radial-gradient(ellipse at 50% 0%, #4a2a14 0%, #1e120a 45%, #0b0807 100%);
+  font-family:'Noto Sans KR',sans-serif;color:#f4ebdd;display:flex;flex-direction:column;align-items:center}
+.cap{margin-top:120px;text-align:center;padding:0 70px}
+.t{font-size:76px;font-weight:700;line-height:1.2;letter-spacing:-1px}
+.t em{font-family:Playfair;font-style:normal}
+.s{margin-top:26px;font-size:40px;color:#d9b98a;font-weight:500;line-height:1.4}
+.phone{margin-top:84px;width:780px;border-radius:64px;padding:18px;background:#000;
+  box-shadow:0 40px 120px rgba(0,0,0,.8),0 0 0 3px #3a302a, 0 0 160px rgba(217,154,78,.25)}
+.phone img{width:100%;display:block;border-radius:48px}
+</style></head><body>
+<div class="cap"><div class="t" id="t"></div><div class="s" id="s"></div></div>
+<div class="phone"><img id="img"></div>
+<script>
+const q=new URLSearchParams(location.search);
+document.getElementById('t').innerHTML=q.get('t');
+document.getElementById('s').innerHTML=q.get('s');
+document.getElementById('img').src=q.get('img');
+</script></body></html>

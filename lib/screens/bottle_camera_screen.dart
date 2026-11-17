@@ -2,6 +2,7 @@ import 'package:camera/camera.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../theme.dart';
+import '../l10n/tr.dart';
 
 /// 병 모양 가이드 틀이 겹쳐진 카메라 화면.
 ///
@@ -52,7 +53,9 @@ class _BottleCameraScreenState extends State<BottleCameraScreen>
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
-        setState(() => _error = '사용할 수 있는 카메라가 없습니다.');
+        setState(
+          () => _error = tr('사용할 수 있는 카메라가 없습니다.', 'No camera available.'),
+        );
         return;
       }
       final back = cameras.firstWhere(
@@ -77,8 +80,14 @@ class _BottleCameraScreenState extends State<BottleCameraScreen>
     } on CameraException catch (e) {
       setState(
         () => _error = e.code == 'CameraAccessDenied'
-            ? '카메라 권한이 필요합니다. 설정에서 카메라 권한을 허용해 주세요.'
-            : '카메라를 켜지 못했습니다: ${e.description ?? e.code}',
+            ? tr(
+                '카메라 권한이 필요합니다. 설정에서 카메라 권한을 허용해 주세요.',
+                'Camera permission is needed. Please allow it in the system settings.',
+              )
+            : tr(
+                '카메라를 켜지 못했습니다: ${e.description ?? e.code}',
+                'Could not start the camera: ${e.description ?? e.code}',
+              ),
       );
     }
   }
@@ -94,7 +103,14 @@ class _BottleCameraScreenState extends State<BottleCameraScreen>
       if (!mounted) return;
       setState(() => _taking = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('사진을 찍지 못했습니다: ${e.description ?? e.code}')),
+        SnackBar(
+          content: Text(
+            tr(
+              '사진을 찍지 못했습니다: ${e.description ?? e.code}',
+              'Could not take the photo: ${e.description ?? e.code}',
+            ),
+          ),
+        ),
       );
     }
   }
@@ -149,19 +165,22 @@ class _BottleCameraScreenState extends State<BottleCameraScreen>
     child: Row(
       children: [
         IconButton(
-          tooltip: '닫기',
+          tooltip: tr('닫기', 'Close'),
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.close, color: Colors.white),
         ),
-        const Expanded(
+        Expanded(
           child: Text(
-            '병을 틀 안에 정면으로 맞춰 주세요\n라벨이 잘 보이게, 단색 배경이면 더 좋아요',
+            tr(
+              '병을 틀 안에 정면으로 맞춰 주세요\n라벨이 잘 보이게, 단색 배경이면 더 좋아요',
+              'Fit the bottle inside the frame, facing you\nKeep the label visible — a plain background works best',
+            ),
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
           ),
         ),
         IconButton(
-          tooltip: _flash ? '조명 끄기' : '조명 켜기',
+          tooltip: _flash ? tr('조명 끄기', 'Torch off') : tr('조명 켜기', 'Torch on'),
           onPressed: _controller == null ? null : _toggleFlash,
           icon: Icon(
             _flash ? Icons.flash_on : Icons.flash_off,
@@ -176,7 +195,7 @@ class _BottleCameraScreenState extends State<BottleCameraScreen>
     padding: const EdgeInsets.symmetric(vertical: 20),
     child: Semantics(
       button: true,
-      label: '촬영',
+      label: tr('촬영', 'Take photo'),
       child: GestureDetector(
         onTap: _take,
         child: Container(

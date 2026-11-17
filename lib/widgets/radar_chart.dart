@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../models/tasting_note.dart';
 import '../theme.dart';
+import '../l10n/tr.dart';
 
 /// PDF의 원형 차트(향, 맛, 비후방 후각).
 ///
@@ -247,7 +248,7 @@ class _HelpButton extends StatelessWidget {
       ),
       child: Semantics(
         button: true,
-        label: '${axis.label} 예시 보기',
+        label: tr('${axis.label} 예시 보기', 'Examples for ${axis.label}'),
         child: const Padding(
           // 손가락으로 누르기 쉽게 주변 여백을 둡니다.
           padding: EdgeInsets.fromLTRB(3, 4, 4, 4),

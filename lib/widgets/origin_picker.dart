@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../models/tasting_note.dart';
 import 'sheet_section.dart';
+import '../l10n/tr.dart';
 
 /// 산지 고르기: 먼저 나라, 그 아래에 그 나라의 세부 지역이 나옵니다.
 /// World는 나라 이름을 직접 적습니다.
@@ -90,7 +91,7 @@ class _OriginPickerState extends State<OriginPicker> {
             textCapitalization: TextCapitalization.words,
             decoration: InputDecoration(
               label: inputLabel('나라', 'Country'),
-              hintText: '예: Germany, India',
+              hintText: tr('예: Germany, India', 'e.g. Germany, India'),
             ),
             onChanged: (v) => widget.onChanged(origin, v.trim()),
           ),

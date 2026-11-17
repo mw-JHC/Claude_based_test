@@ -5,6 +5,7 @@ import '../data/note_store.dart';
 import '../theme.dart';
 import '../widgets/cabinet_view.dart';
 import 'note_detail_screen.dart';
+import '../l10n/tr.dart';
 
 /// 다 마신 병을 전시하는 곳. 노트와 이야기는 그대로 남아 있습니다.
 class MemoryLibraryScreen extends StatelessWidget {
@@ -37,7 +38,7 @@ class MemoryLibraryScreen extends StatelessWidget {
                   child: Row(
                     children: [
                       IconButton(
-                        tooltip: '뒤로',
+                        tooltip: tr('뒤로', 'Back'),
                         onPressed: () => Navigator.of(context).maybePop(),
                         icon: const Icon(Icons.arrow_back),
                       ),
@@ -58,7 +59,10 @@ class MemoryLibraryScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '비운 병 ${store.emptiedBottles}  ·  이야기 $stories',
+                              tr(
+                                '비운 병 ${store.emptiedBottles}  ·  이야기 $stories',
+                                '${tr.bottles(store.emptiedBottles)} emptied  ·  ${stories == 1 ? '1 story' : '$stories stories'}',
+                              ),
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: NoteColors.hint,
@@ -112,13 +116,13 @@ class _NoMemories extends StatelessWidget {
           borderRadius: BorderRadius.circular(22),
           border: Border.all(color: NoteColors.line),
         ),
-        child: const Column(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.auto_stories_outlined, size: 36, color: NoteColors.gold),
             SizedBox(height: 14),
             Text(
-              '아직 비운 병이 없어요',
+              tr('아직 비운 병이 없어요', 'No empty bottles yet'),
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
@@ -127,7 +131,10 @@ class _NoMemories extends StatelessWidget {
             ),
             SizedBox(height: 6),
             Text(
-              '다 마신 병은 노트에서 "병 비우기"를 누르면\n이야기와 함께 이곳에 전시됩니다.',
+              tr(
+                '다 마신 병은 노트에서 "병 비우기"를 누르면\n이야기와 함께 이곳에 전시됩니다.',
+                'When you finish a bottle, tap "Empty bottle" in its note\nand it moves here together with its stories.',
+              ),
               textAlign: TextAlign.center,
               style: TextStyle(color: NoteColors.hint, height: 1.5),
             ),

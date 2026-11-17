@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../models/tasting_note.dart';
 import '../theme.dart';
+import '../l10n/tr.dart';
 
 /// 색상 막대 (0.0 연한 짚색 → 1.0 짙은 마호가니).
 const _stops = <(double, Color)>[
@@ -88,7 +89,7 @@ class ColorScalePicker extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              '선택: ${formatColor(value!)}',
+              '${tr('선택', 'Selected')}: ${formatColor(value!)}',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontWeight: FontWeight.bold,

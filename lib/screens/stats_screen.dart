@@ -4,6 +4,7 @@ import '../data/note_store.dart';
 import '../models/tasting_note.dart';
 import '../theme.dart';
 import '../widgets/sheet_section.dart';
+import '../l10n/tr.dart';
 
 /// 내 위스키 통계: 순위, 진열장과 빈 병이 어디 산인지, 무엇을 주로 마셨는지.
 class StatsScreen extends StatefulWidget {
@@ -39,9 +40,12 @@ class _StatsScreenState extends State<StatsScreen> {
           final memories = store.memories;
           final all = store.notes;
           if (all.isEmpty) {
-            return const Center(
+            return Center(
               child: Text(
-                '위스키를 기록하면 통계가 여기에 나타나요',
+                tr(
+                  '위스키를 기록하면 통계가 여기에 나타나요',
+                  'Your statistics appear here once you add whiskies',
+                ),
                 style: TextStyle(color: NoteColors.hint),
               ),
             );
@@ -131,7 +135,9 @@ class _StatsScreenState extends State<StatsScreen> {
       trailing: ranking.length <= 1
           ? null
           : IconButton(
-              tooltip: _rank == _RankView.top1 ? '10위까지 보기' : '접기',
+              tooltip: _rank == _RankView.top1
+                  ? tr('10위까지 보기', 'Show top 10')
+                  : tr('접기', 'Collapse'),
               visualDensity: VisualDensity.compact,
               onPressed: () => setState(
                 () => _rank = _rank == _RankView.top1
@@ -145,8 +151,8 @@ class _StatsScreenState extends State<StatsScreen> {
               ),
             ),
       child: ranking.isEmpty
-          ? const Text(
-              '점수를 매긴 위스키가 없어요.',
+          ? Text(
+              tr('점수를 매긴 위스키가 없어요.', 'No scored whiskies yet.'),
               style: TextStyle(color: NoteColors.hint),
             )
           : AnimatedSize(
@@ -164,13 +170,21 @@ class _StatsScreenState extends State<StatsScreen> {
                           builder: (_) => RankingScreen(store: widget.store),
                         ),
                       ),
-                      child: Text('…  전체 ${ranking.length}병 순위 보기'),
+                      child: Text(
+                        tr(
+                          '…  전체 ${ranking.length}병 순위 보기',
+                          '…  Full ranking (${tr.bottles(ranking.length)})',
+                        ),
+                      ),
                     ),
                   if (_rank == _RankView.top10 && scored.length < total)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
-                        '점수 없는 ${total - scored.length}병은 순위에서 빠졌어요',
+                        tr(
+                          '점수 없는 ${total - scored.length}병은 순위에서 빠졌어요',
+                          '${tr.bottles(total - scored.length)} without a score are not ranked',
+                        ),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontSize: 11.5,
@@ -203,7 +217,7 @@ class _StatsScreenState extends State<StatsScreen> {
       bars.add(_Bar(o.label, _bottles(group), detail));
     }
     final unknown = _bottles(notes.where((n) => n.origin == null));
-    if (unknown > 0) bars.add(_Bar('미입력', unknown, ''));
+    if (unknown > 0) bars.add(_Bar(tr('미입력', 'Not set'), unknown, ''));
     return bars..sort((a, b) => b.count.compareTo(a.count));
   }
 
@@ -219,7 +233,7 @@ class _StatsScreenState extends State<StatsScreen> {
         _Bar(t.label, _bottles(notes.where((n) => n.type == t)), ''),
     ].where((b) => b.count > 0).toList();
     final unknown = _bottles(notes.where((n) => n.type == null));
-    if (unknown > 0) bars.add(_Bar('미입력', unknown, ''));
+    if (unknown > 0) bars.add(_Bar(tr('미입력', 'Not set'), unknown, ''));
     return bars..sort((a, b) => b.count.compareTo(a.count));
   }
 }
@@ -277,7 +291,10 @@ class _Bars extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (bars.isEmpty) {
-      return const Text('기록이 없어요.', style: TextStyle(color: NoteColors.hint));
+      return Text(
+        tr('기록이 없어요.', 'Nothing recorded.'),
+        style: TextStyle(color: NoteColors.hint),
+      );
     }
     final total = bars.fold<int>(0, (s, b) => s + b.count);
     final maxCount = bars.map((b) => b.count).reduce((a, b) => a > b ? a : b);
@@ -302,7 +319,7 @@ class _Bars extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '${b.count}병  ${(b.count * 100 / total).round()}%',
+                      '${tr.bottles(b.count)}  ${(b.count * 100 / total).round()}%',
                       style: const TextStyle(
                         fontSize: 12.5,
                         color: NoteColors.hint,
@@ -380,8 +397,8 @@ class _RankRow extends StatelessWidget {
                   ),
                 ),
                 if (tied)
-                  const Text(
-                    '공동',
+                  Text(
+                    tr('공동', 'tied'),
                     style: TextStyle(fontSize: 9.5, color: NoteColors.hint),
                   ),
               ],
@@ -405,7 +422,7 @@ class _RankRow extends StatelessWidget {
                   Text(
                     [
                       if (note.regionLabel.isNotEmpty) note.regionLabel,
-                      if (note.isEmpty) '빈 병',
+                      if (note.isEmpty) tr('빈 병', 'Empty'),
                     ].join(' · '),
                     style: const TextStyle(
                       fontSize: 11.5,
@@ -516,7 +533,7 @@ class RankEntry {
   const RankEntry(this.rank, this.tied, this.note);
   final int rank;
 
-  /// 같은 점수의 병이 더 있으면 true ("공동")
+  /// 같은 점수의 병이 더 있으면 true (tr("공동", 'tied'))
   final bool tied;
   final TastingNote note;
 }
@@ -574,8 +591,11 @@ class RankingScreen extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         unscored > 0
-                            ? '${ranking.length}병 · 점수 없음 $unscored병'
-                            : '${ranking.length}병',
+                            ? tr(
+                                '${ranking.length}병 · 점수 없음 $unscored병',
+                                '${tr.bottles(ranking.length)} · $unscored without a score',
+                              )
+                            : tr.bottles(ranking.length),
                         style: const TextStyle(
                           fontSize: 12,
                           color: NoteColors.hint,

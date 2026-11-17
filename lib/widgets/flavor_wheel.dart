@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../models/tasting_note.dart';
 import '../theme.dart';
 import 'radar_chart.dart';
+import '../l10n/tr.dart';
 
 /// 향 / 맛 / 비후방 후각 칸에 들어가는 원형 차트.
 ///
@@ -31,8 +32,14 @@ class FlavorWheel extends StatelessWidget {
         if (editable)
           Text(
             hasHelp
-                ? '차트를 누르거나 끌어서 강도를 정하세요 (중심 0 ~ 바깥 10)\n(?)를 누르면 예시가 나옵니다'
-                : '차트를 누르거나 끌어서 강도를 정하세요 (중심 0 ~ 바깥 10)',
+                ? tr(
+                    '차트를 누르거나 끌어서 강도를 정하세요 (중심 0 ~ 바깥 10)\n(?)를 누르면 예시가 나옵니다',
+                    'Tap or drag the chart to set the intensity (centre 0 – edge 10)\nTap (?) for examples',
+                  )
+                : tr(
+                    '차트를 누르거나 끌어서 강도를 정하세요 (중심 0 ~ 바깥 10)',
+                    'Tap or drag the chart to set the intensity (centre 0 – edge 10)',
+                  ),
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 12, color: NoteColors.hint),
           ),

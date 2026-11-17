@@ -32,14 +32,22 @@ class WhiskyNoteApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Whisky Library',
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
-      // 처음 실행이면 환영 화면부터 (기록이 이미 있는 예전 사용자는 건너뜀)
-      home: settings.onboarded || store.notes.isNotEmpty
-          ? NoteListScreen(store: store, settings: settings)
-          : WelcomeScreen(store: store, settings: settings),
+    // 언어가 바뀌면 앱 전체를 새 언어로 다시 그립니다 (첫 화면으로 돌아감).
+    return ListenableBuilder(
+      listenable: settings,
+      builder: (context, _) => MaterialApp(
+        key: ValueKey(settings.language),
+        title: 'Whisky Library',
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(),
+        locale: Locale(settings.language.name),
+        supportedLocales: const [Locale('en'), Locale('ko')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        // 처음 실행이면 환영 화면부터 (기록이 이미 있는 예전 사용자는 건너뜀)
+        home: settings.onboarded || store.notes.isNotEmpty
+            ? NoteListScreen(store: store, settings: settings)
+            : WelcomeScreen(store: store, settings: settings),
+      ),
     );
   }
 }

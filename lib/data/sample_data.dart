@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import '../models/tasting_note.dart';
+import '../l10n/tr.dart';
 import 'note_store.dart';
 
 /// 테스트용 샘플 위스키. id가 이 글자로 시작해서 한꺼번에 지울 수 있습니다.
@@ -463,19 +464,58 @@ const _samples = <_S>[
 ];
 
 /// 비운 병으로 만들 샘플 (Memory Library 테스트용) 과 그 이야기.
-const _emptied = <String, List<(String text, String companions)>>{
+const _emptied = <String, List<(String, String, String, String)>>{
+  // (이야기, 함께한 사람, story, with)
   'Laphroaig 10': [
-    ('처음 마셔본 아일라. 병원 냄새에 놀랐는데 두 번째 잔부터 빠져들었다.', '대학 동기들'),
-    ('마지막 한 잔. 바닷바람이 생각나는 짠맛.', '혼자'),
+    (
+      '처음 마셔본 아일라. 병원 냄새에 놀랐는데 두 번째 잔부터 빠져들었다.',
+      '대학 동기들',
+      'My first Islay. The medicinal nose was a shock, but by the second glass I was hooked.',
+      'University friends',
+    ),
+    (
+      '마지막 한 잔. 바닷바람이 생각나는 짠맛.',
+      '혼자',
+      'The last dram. Salty, like a sea breeze.',
+      'On my own',
+    ),
   ],
-  'Glenfiddich 12': [('입문으로 좋았던 병. 배와 사과 향.', '아내')],
-  'Monkey Shoulder': [('하이볼로 거의 다 마셨다.', '회사 동료들')],
-  'Johnnie Walker Black Label': [('명절에 아버지와 함께.', '아버지')],
+  'Glenfiddich 12': [
+    (
+      '입문으로 좋았던 병. 배와 사과 향.',
+      '아내',
+      'A great first single malt. Pear and apple.',
+      'My wife',
+    ),
+  ],
+  'Monkey Shoulder': [
+    ('하이볼로 거의 다 마셨다.', '회사 동료들', 'Mostly went into highballs.', 'Colleagues'),
+  ],
+  'Johnnie Walker Black Label': [
+    (
+      '명절에 아버지와 함께.',
+      '아버지',
+      'Shared with my father over the holidays.',
+      'My father',
+    ),
+  ],
   'Jameson Black Barrel': [],
-  'Maker\'s Mark': [('바닐라와 캐러멜. 겨울밤에 잘 어울림.', '친구')],
+  'Maker\'s Mark': [
+    (
+      '바닐라와 캐러멜. 겨울밤에 잘 어울림.',
+      '친구',
+      'Vanilla and caramel. Perfect for a winter night.',
+      'A friend',
+    ),
+  ],
   'Talisker 10': [
-    ('후추 같은 매운 피니시. 굴이랑 같이 먹으니 최고.', '아내'),
-    ('캠핑에서 모닥불 앞에서.', '캠핑 멤버들'),
+    (
+      '후추 같은 매운 피니시. 굴이랑 같이 먹으니 최고.',
+      '아내',
+      'Peppery finish. Amazing with oysters.',
+      'My wife',
+    ),
+    ('캠핑에서 모닥불 앞에서.', '캠핑 멤버들', 'By the campfire.', 'Camping crew'),
   ],
   'Jack Daniel\'s Old No.7': [],
 };
@@ -503,7 +543,11 @@ Future<int> addSampleWhiskies(NoteStore store) async {
         type: type,
         origin: origin,
         subRegion: sub,
-        ageCask: age,
+        // '12년 / Sherry' → 영어 화면이면 '12 yrs / Sherry'
+        ageCask: age.replaceAllMapped(
+          RegExp(r'(\d+)년'),
+          (m) => tr.age(int.parse(m.group(1)!)),
+        ),
         abv: abv,
         price: price,
         score: score,
@@ -543,17 +587,18 @@ Future<int> addSampleWhiskies(NoteStore store) async {
           'smoothIntense': abv > 48 ? r(6, 9) : r(2, 6),
         },
         finish: r(3, 9),
-        overall: score >= 88 ? '다시 사고 싶은 병.' : '',
+        overall: score >= 88 ? tr('다시 사고 싶은 병.', 'Would buy again.') : '',
         emptiedAt: stories == null
             ? null
             : now.subtract(Duration(days: r(3, 200))),
         stories: [
-          for (final (j, (text, who)) in (stories ?? const []).indexed)
+          for (final (j, (textKo, whoKo, textEn, whoEn))
+              in (stories ?? const []).indexed)
             StoryEntry(
               id: '$samplePrefix$i-story-$j',
               date: created.add(Duration(days: 10 + j * 25)),
-              text: text,
-              companions: who,
+              text: tr(textKo, textEn),
+              companions: tr(whoKo, whoEn),
             ),
         ],
         createdAt: created,

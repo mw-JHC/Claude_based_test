@@ -9,6 +9,7 @@ import 'package:whisky_note/models/tasting_note.dart';
 import 'package:whisky_note/screens/note_edit_screen.dart';
 import 'package:whisky_note/services/bottle_scanner.dart';
 import 'package:whisky_note/services/label_parser.dart';
+import 'package:whisky_note/l10n/tr.dart';
 
 /// 실제 병 사진 3장에서 나올 법한 라벨 글자 (글자, 글자 높이).
 const slyrs = [
@@ -50,6 +51,9 @@ class FakeScanner implements BottleScanner {
 }
 
 void main() {
+  // 이 테스트들은 한국어 화면 기준으로 씁니다.
+  setUp(() => tr.language = AppLanguage.ko);
+
   group('라벨 읽기', () {
     test('SLYRS: 가장 큰 글자가 이름, 로트 번호는 무시', () {
       final g = parseLabel(slyrs);

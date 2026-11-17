@@ -10,8 +10,12 @@ import 'package:whisky_note/data/note_store.dart';
 import 'package:whisky_note/main.dart';
 import 'package:whisky_note/models/tasting_note.dart';
 import 'package:whisky_note/screens/note_list_screen.dart';
+import 'package:whisky_note/l10n/tr.dart';
 
 void main() {
+  // 이 테스트들은 한국어 화면 기준으로 씁니다.
+  setUp(() => tr.language = AppLanguage.ko);
+
   group('백업', () {
     test('노트와 사진을 zip으로 묶었다가 다른 폰(빈 저장소)에 그대로 복원한다', () async {
       final from = MemoryNoteStorage();
@@ -68,7 +72,7 @@ void main() {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 2.5;
     addTearDown(tester.view.reset);
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({'language': 'ko'});
     final settings = await AppSettings.load();
     final store = NoteStore(MemoryNoteStorage());
     await store.load(); // 앱도 시작 전에 기록을 읽습니다
@@ -95,7 +99,7 @@ void main() {
   });
 
   testWidgets('기록이 이미 있으면 환영 화면을 건너뛴다', (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({'language': 'ko'});
     final settings = await AppSettings.load();
     final store = NoteStore(MemoryNoteStorage());
     await store.upsert(TastingNote(id: 'a', name: 'A'));

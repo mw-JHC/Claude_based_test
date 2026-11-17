@@ -10,6 +10,7 @@ import '../widgets/sheet_section.dart';
 import '../widgets/whisky_bottle.dart';
 import 'note_edit_screen.dart';
 import 'story_edit_screen.dart';
+import '../l10n/tr.dart';
 
 /// 저장된 노트를 보는 화면.
 class NoteDetailScreen extends StatelessWidget {
@@ -26,16 +27,24 @@ class NoteDetailScreen extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('노트 삭제'),
-        content: Text('"${note.name}" 노트를 삭제할까요?\n삭제하면 되돌릴 수 없습니다.'),
+        title: Text(tr('노트 삭제', 'Delete note')),
+        content: Text(
+          tr(
+            '"${note.name}" 노트를 삭제할까요?\n삭제하면 되돌릴 수 없습니다.',
+            'Delete the note for "${note.name}"?\nThis cannot be undone.',
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c, false),
-            child: const Text('취소'),
+            child: Text(tr('취소', 'Cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('삭제', style: TextStyle(color: Color(0xFFE0605E))),
+            child: Text(
+              tr('삭제', 'Delete'),
+              style: TextStyle(color: Color(0xFFE0605E)),
+            ),
           ),
         ],
       ),
@@ -62,7 +71,7 @@ class NoteDetailScreen extends StatelessWidget {
                 leading: const _CircleBack(),
                 actions: [
                   _circleAction(
-                    tooltip: '수정',
+                    tooltip: tr('수정', 'Edit'),
                     icon: Icons.edit_outlined,
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute(
@@ -72,7 +81,7 @@ class NoteDetailScreen extends StatelessWidget {
                     ),
                   ),
                   _circleAction(
-                    tooltip: '삭제',
+                    tooltip: tr('삭제', 'Delete'),
                     icon: Icons.delete_outline,
                     onPressed: () => _delete(context, note),
                   ),
@@ -148,9 +157,15 @@ class NoteDetailScreen extends StatelessWidget {
                     Center(
                       child: Text(
                         [
-                          '${_date(note.createdAt)} 기록',
+                          tr(
+                            '${_date(note.createdAt)} 기록',
+                            'Added ${_date(note.createdAt)}',
+                          ),
                           if (note.emptiedAt != null)
-                            '${_date(note.emptiedAt!)} 비움',
+                            tr(
+                              '${_date(note.emptiedAt!)} 비움',
+                              'Emptied ${_date(note.emptiedAt!)}',
+                            ),
                         ].join('  ·  '),
                         style: const TextStyle(
                           fontSize: 12,
@@ -174,7 +189,11 @@ class NoteDetailScreen extends StatelessWidget {
     return OutlinedButton.icon(
       onPressed: () => _toggleEmpty(context, note),
       icon: Icon(empty ? Icons.shelves : Icons.local_drink_outlined),
-      label: Text(empty ? '다시 진열장에 놓기' : '병 비우기 (Empty)'),
+      label: Text(
+        empty
+            ? tr('다시 진열장에 놓기', 'Put back in the cabinet')
+            : tr('병 비우기 (Empty)', 'Empty bottle'),
+      ),
       style: OutlinedButton.styleFrom(
         minimumSize: const Size.fromHeight(50),
         foregroundColor: empty ? NoteColors.text : NoteColors.gold,
@@ -194,7 +213,7 @@ class NoteDetailScreen extends StatelessWidget {
 
     if (note.isEmpty) {
       await store.restore(note);
-      if (context.mounted) snack('진열장에 다시 놓았어요.');
+      if (context.mounted) snack(tr('진열장에 다시 놓았어요.', 'Back in the cabinet.'));
       return;
     }
 
@@ -206,31 +225,44 @@ class NoteDetailScreen extends StatelessWidget {
     final choice = await showDialog<_EmptyChoice>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('병을 비울까요?'),
+        title: Text(tr('병을 비울까요?', 'Empty this bottle?')),
         content: Text(
           previous.isEmpty
-              ? '진열장에서 Memory Library로 옮겨집니다.\n노트와 이야기는 그대로 남아요.'
-              : 'Memory Library에 이미 "${note.name}" 빈 병이 '
-                    '${store.emptiedWithName(note.name)}병 있어요.\n\n'
-                    '기존 빈 병 기록에 합치면 이야기를 날짜순으로 함께 모으고 '
-                    '비운 병 수를 하나 늘립니다.',
+              ? tr(
+                  '진열장에서 Memory Library로 옮겨집니다.\n노트와 이야기는 그대로 남아요.',
+                  'It moves from your cabinet to the Memory Library.\nThe note and stories are kept.',
+                )
+              : tr(
+                  'Memory Library에 이미 "${note.name}" 빈 병이 '
+                      '${store.emptiedWithName(note.name)}병 있어요.\n\n'
+                      '기존 빈 병 기록에 합치면 이야기를 날짜순으로 함께 모으고 '
+                      '비운 병 수를 하나 늘립니다.',
+                  'The Memory Library already has '
+                      '${tr.bottles(store.emptiedWithName(note.name))} of "${note.name}".\n\n'
+                      'Merging adds this bottle to that record: stories are combined '
+                      'by date and the empty bottle count goes up by one.',
+                ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c),
-            child: const Text('취소'),
+            child: Text(tr('취소', 'Cancel')),
           ),
           if (previous.isNotEmpty)
             TextButton(
               onPressed: () => Navigator.pop(c, _EmptyChoice.separate),
-              child: const Text('따로 보관'),
+              child: Text(tr('따로 보관', 'Keep separate')),
             ),
           FilledButton(
             onPressed: () => Navigator.pop(
               c,
               previous.isEmpty ? _EmptyChoice.separate : _EmptyChoice.merge,
             ),
-            child: Text(previous.isEmpty ? '비우기' : '기존 기록에 합치기'),
+            child: Text(
+              previous.isEmpty
+                  ? tr('비우기', 'Empty')
+                  : tr('기존 기록에 합치기', 'Merge with record'),
+            ),
           ),
         ],
       ),
@@ -240,7 +272,12 @@ class NoteDetailScreen extends StatelessWidget {
     if (choice == _EmptyChoice.separate) {
       await store.empty(note);
       if (context.mounted) {
-        snack('Memory Library로 옮겼어요. 고마웠어, ${note.name}!');
+        snack(
+          tr(
+            'Memory Library로 옮겼어요. 고마웠어, ${note.name}!',
+            'Moved to the Memory Library. Cheers, ${note.name}!',
+          ),
+        );
       }
       return;
     }
@@ -253,8 +290,12 @@ class NoteDetailScreen extends StatelessWidget {
       ),
     );
     snack(
-      '기존 빈 병 기록에 합쳤어요. "${note.name}" 빈 병 '
-      '${store.emptiedWithName(note.name)}병',
+      tr(
+        '기존 빈 병 기록에 합쳤어요. "${note.name}" 빈 병 '
+            '${store.emptiedWithName(note.name)}병',
+        'Merged. "${note.name}": '
+            '${tr.bottles(store.emptiedWithName(note.name))} emptied',
+      ),
     );
   }
 
@@ -281,10 +322,22 @@ class NoteDetailScreen extends StatelessWidget {
       if (note.regionLabel.isNotEmpty) (Icons.place_outlined, note.regionLabel),
       if (note.ageCask.isNotEmpty) (Icons.hourglass_bottom, note.ageCask),
       if (note.emptiedAt != null)
-        (Icons.auto_stories_outlined, '빈 병 · ${_date(note.emptiedAt!)}'),
+        (
+          Icons.auto_stories_outlined,
+          tr(
+            '빈 병 · ${_date(note.emptiedAt!)}',
+            'Empty · ${_date(note.emptiedAt!)}',
+          ),
+        ),
       // 같은 이름으로 비운 병이 여러 병이면 모두 몇 병인지
       if (note.isEmpty && store.emptiedWithName(note.name) > 1)
-        (Icons.layers_outlined, '같은 병 ${store.emptiedWithName(note.name)}병 비움'),
+        (
+          Icons.layers_outlined,
+          tr(
+            '같은 병 ${store.emptiedWithName(note.name)}병 비움',
+            '${tr.bottles(store.emptiedWithName(note.name))} of this emptied',
+          ),
+        ),
     ];
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,8 +445,7 @@ class NoteDetailScreen extends StatelessWidget {
     );
   }
 
-  static String _date(DateTime d) =>
-      '${d.year}.${d.month.toString().padLeft(2, '0')}.${d.day.toString().padLeft(2, '0')}';
+  static String _date(DateTime d) => tr.date(d);
 }
 
 class _CircleBack extends StatelessWidget {
@@ -403,7 +455,7 @@ class _CircleBack extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.all(6),
     child: IconButton(
-      tooltip: '뒤로',
+      tooltip: tr('뒤로', 'Back'),
       onPressed: () => Navigator.of(context).maybePop(),
       icon: const Icon(Icons.arrow_back, size: 20),
       style: IconButton.styleFrom(
@@ -536,10 +588,10 @@ class _FlavorCardState extends State<_FlavorCard> {
         children: [
           SegmentedButton<int>(
             showSelectedIcon: false,
-            segments: const [
-              ButtonSegment(value: 0, label: Text('향')),
-              ButtonSegment(value: 1, label: Text('맛')),
-              ButtonSegment(value: 2, label: Text('비후방')),
+            segments: [
+              ButtonSegment(value: 0, label: Text(tr('향', 'Nose'))),
+              ButtonSegment(value: 1, label: Text(tr('맛', 'Palate'))),
+              ButtonSegment(value: 2, label: Text(tr('비후방', 'Retronasal'))),
             ],
             selected: {_tab},
             onSelectionChanged: (v) => setState(() => _tab = v.first),
@@ -583,10 +635,13 @@ class _Stories extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (stories.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(bottom: 12),
               child: Text(
-                '이 병을 마신 날의 맛, 함께한 사람, 사진을 남겨 보세요.',
+                tr(
+                  '이 병을 마신 날의 맛, 함께한 사람, 사진을 남겨 보세요.',
+                  'Note how it tasted, who you shared it with and add photos each time you pour.',
+                ),
                 style: TextStyle(color: NoteColors.hint, height: 1.5),
               ),
             ),

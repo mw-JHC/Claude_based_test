@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../theme.dart';
+import '../l10n/tr.dart';
 
 /// 둥근 카드 한 칸. 위에 한국어 제목과 작은 영문 부제가 붙습니다.
 class SheetSection extends StatelessWidget {
@@ -36,14 +37,15 @@ class SheetSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
-                title,
+                // 영어 화면에서는 영어 부제를 제목으로만 씁니다.
+                tr.ko ? title : (subtitle ?? title),
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: NoteColors.text,
                 ),
               ),
-              if (subtitle != null) ...[
+              if (subtitle != null && tr.ko) ...[
                 const SizedBox(width: 8),
                 Text(
                   subtitle!,
@@ -258,6 +260,18 @@ class BiLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 영어 화면: 영어만 굵게
+    if (!tr.ko) {
+      return Text(
+        en,
+        textAlign: center ? TextAlign.center : null,
+        style: TextStyle(
+          fontSize: size,
+          fontWeight: FontWeight.w700,
+          color: NoteColors.text,
+        ),
+      );
+    }
     final koText = Text(
       ko,
       style: TextStyle(
@@ -297,19 +311,22 @@ class BiLabel extends StatelessWidget {
   }
 }
 
-/// 입력칸 이름표: 한글 뒤에 이탤릭 영어. 색은 입력칸 상태(흐림/강조)를 따릅니다.
-Widget inputLabel(String ko, String en) => Text.rich(
-  TextSpan(
-    text: ko,
-    children: [
-      TextSpan(
-        text: '  $en',
-        style: const TextStyle(
-          fontFamily: serif,
-          fontStyle: FontStyle.italic,
-          fontSize: 13,
+/// 입력칸 이름표: 한글 뒤에 이탤릭 영어 (영어 화면에서는 영어만).
+/// 색은 입력칸 상태(흐림/강조)를 따릅니다.
+Widget inputLabel(String ko, String en) => !tr.ko
+    ? Text(en)
+    : Text.rich(
+        TextSpan(
+          text: ko,
+          children: [
+            TextSpan(
+              text: '  $en',
+              style: const TextStyle(
+                fontFamily: serif,
+                fontStyle: FontStyle.italic,
+                fontSize: 13,
+              ),
+            ),
+          ],
         ),
-      ),
-    ],
-  ),
-);
+      );

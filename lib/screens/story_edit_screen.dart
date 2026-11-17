@@ -7,6 +7,7 @@ import '../data/note_store.dart';
 import '../models/tasting_note.dart';
 import '../theme.dart';
 import '../widgets/sheet_section.dart';
+import '../l10n/tr.dart';
 
 /// 병 하나에 이야기 한 편을 쓰거나 고칩니다.
 /// 그날의 맛, 함께한 사람, 사진을 날짜와 함께 남깁니다.
@@ -79,16 +80,28 @@ class _StoryEditScreenState extends State<StoryEditScreen> {
       setState(() => _photos.addAll(picked.map((x) => _Photo.picked(x.path))));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('사진을 가져오지 못했습니다: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            tr('사진을 가져오지 못했습니다: $e', 'Could not load the photo: $e'),
+          ),
+        ),
+      );
     }
   }
 
   Future<void> _save() async {
     if (_text.text.trim().isEmpty && _photos.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('이야기나 사진을 하나 이상 남겨 주세요.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            tr(
+              '이야기나 사진을 하나 이상 남겨 주세요.',
+              'Add some text or at least one photo.',
+            ),
+          ),
+        ),
+      );
       return;
     }
     setState(() => _saving = true);
@@ -117,16 +130,21 @@ class _StoryEditScreenState extends State<StoryEditScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('이야기 삭제'),
-        content: const Text('이 이야기와 사진을 지울까요?'),
+        title: Text(tr('이야기 삭제', 'Delete story')),
+        content: Text(
+          tr('이 이야기와 사진을 지울까요?', 'Delete this story and its photos?'),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c, false),
-            child: const Text('취소'),
+            child: Text(tr('취소', 'Cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('삭제', style: TextStyle(color: Color(0xFFE0605E))),
+            child: Text(
+              tr('삭제', 'Delete'),
+              style: TextStyle(color: Color(0xFFE0605E)),
+            ),
           ),
         ],
       ),
@@ -146,7 +164,7 @@ class _StoryEditScreenState extends State<StoryEditScreen> {
         actions: [
           if (!_isNew)
             IconButton(
-              tooltip: '이야기 삭제',
+              tooltip: tr('이야기 삭제', 'Delete story'),
               onPressed: _delete,
               icon: const Icon(Icons.delete_outline),
             ),
@@ -158,7 +176,7 @@ class _StoryEditScreenState extends State<StoryEditScreen> {
           child: FilledButton.icon(
             onPressed: _saving ? null : _save,
             icon: const Icon(Icons.check),
-            label: const Text('이야기 저장'),
+            label: Text(tr('이야기 저장', 'Save story')),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
             ),
@@ -179,7 +197,7 @@ class _StoryEditScreenState extends State<StoryEditScreen> {
           ),
           const SizedBox(height: 14),
           SheetSection(
-            title: '그날',
+            title: tr('그날', 'Day'),
             subtitle: 'Day',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -205,15 +223,18 @@ class _StoryEditScreenState extends State<StoryEditScreen> {
                   controller: _text,
                   minLines: 5,
                   maxLines: null,
-                  decoration: const InputDecoration(
-                    hintText: '그날의 맛, 분위기, 기억하고 싶은 이야기 …',
+                  decoration: InputDecoration(
+                    hintText: tr(
+                      '그날의 맛, 분위기, 기억하고 싶은 이야기 …',
+                      'How it tasted, the mood, what you want to remember …',
+                    ),
                   ),
                 ),
               ],
             ),
           ),
           SheetSection(
-            title: '사진',
+            title: tr('사진', 'Photos'),
             subtitle: 'Photos',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -237,7 +258,7 @@ class _StoryEditScreenState extends State<StoryEditScreen> {
                       child: OutlinedButton.icon(
                         onPressed: () => _addPhotos(ImageSource.camera),
                         icon: const Icon(Icons.photo_camera_outlined),
-                        label: const Text('촬영'),
+                        label: Text(tr('촬영', 'Camera')),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -245,7 +266,7 @@ class _StoryEditScreenState extends State<StoryEditScreen> {
                       child: OutlinedButton.icon(
                         onPressed: () => _addPhotos(ImageSource.gallery),
                         icon: const Icon(Icons.photo_library_outlined),
-                        label: const Text('갤러리'),
+                        label: Text(tr('갤러리', 'Gallery')),
                       ),
                     ),
                   ],
@@ -276,7 +297,7 @@ class _StoryEditScreenState extends State<StoryEditScreen> {
           top: 4,
           right: 4,
           child: IconButton(
-            tooltip: '사진 빼기',
+            tooltip: tr('사진 빼기', 'Remove photo'),
             visualDensity: VisualDensity.compact,
             onPressed: () => setState(() => _photos.removeAt(i)),
             icon: const Icon(Icons.close, size: 16),
@@ -291,9 +312,5 @@ class _StoryEditScreenState extends State<StoryEditScreen> {
   }
 }
 
-/// 이야기 날짜 (예: 2026.11.20 (금))
-String storyDate(DateTime d) {
-  const days = ['월', '화', '수', '목', '금', '토', '일'];
-  return '${d.year}.${d.month.toString().padLeft(2, '0')}.'
-      '${d.day.toString().padLeft(2, '0')} (${days[d.weekday - 1]})';
-}
+/// 이야기 날짜 (예: 2026.11.20 (금) / Fri, Nov 20, 2026)
+String storyDate(DateTime d) => tr.dateWithDay(d);

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 
 import '../models/tasting_note.dart';
+import '../l10n/tr.dart';
 import 'note_store.dart';
 
 /// 백업 파일 안의 노트 목록 이름
@@ -95,11 +96,21 @@ class BackupService {
     try {
       archive = ZipDecoder().decodeBytes(zip);
     } catch (_) {
-      throw const BackupException('Whisky Library 백업 파일(.zip)이 아니에요.');
+      throw BackupException(
+        tr(
+          'Whisky Library 백업 파일(.zip)이 아니에요.',
+          'This is not a Whisky Library backup (.zip).',
+        ),
+      );
     }
     final entry = archive.findFile(_notesEntry);
     if (entry == null) {
-      throw const BackupException('백업 파일 안에 위스키 기록이 없어요.');
+      throw BackupException(
+        tr(
+          '백업 파일 안에 위스키 기록이 없어요.',
+          'The backup file contains no whisky notes.',
+        ),
+      );
     }
     try {
       final data =
@@ -107,7 +118,7 @@ class BackupService {
       if (data['notes'] is! List) throw const FormatException();
       return (archive, data);
     } catch (_) {
-      throw const BackupException('백업 파일이 손상됐어요.');
+      throw BackupException(tr('백업 파일이 손상됐어요.', 'The backup file is damaged.'));
     }
   }
 }

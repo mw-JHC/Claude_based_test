@@ -7,6 +7,7 @@ import 'package:whisky_note/models/tasting_note.dart';
 import 'package:whisky_note/screens/note_detail_screen.dart';
 import 'package:whisky_note/screens/note_edit_screen.dart';
 import 'package:whisky_note/screens/stats_screen.dart';
+import 'package:whisky_note/l10n/tr.dart';
 
 /// 지운 사진을 기억하는 저장소.
 class TrackingStorage extends MemoryNoteStorage {
@@ -17,6 +18,9 @@ class TrackingStorage extends MemoryNoteStorage {
 }
 
 void main() {
+  // 이 테스트들은 한국어 화면 기준으로 씁니다.
+  setUp(() => tr.language = AppLanguage.ko);
+
   test('예전 색상 값(0~2)은 0~1로 바뀌고, 새 값은 그대로', () {
     final old = TastingNote.fromJson({'id': 'a', 'color': 1.2});
     expect(old.color, closeTo(0.6, 1e-9));

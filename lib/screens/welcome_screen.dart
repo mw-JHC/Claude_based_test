@@ -6,6 +6,7 @@ import '../data/sample_data.dart';
 import '../theme.dart';
 import 'note_edit_screen.dart';
 import 'note_list_screen.dart';
+import '../l10n/tr.dart';
 
 /// 처음 실행할 때 한 번 보여주는 환영 화면.
 class WelcomeScreen extends StatefulWidget {
@@ -78,8 +79,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                '마셔본 위스키를 진열장에 세우고,\n한 잔과 함께한 기억을 남기세요.',
+              Text(
+                tr(
+                  '마셔본 위스키를 진열장에 세우고,\n한 잔과 함께한 기억을 남기세요.',
+                  'Line up every whisky you have tasted\nand keep the memories of each dram.',
+                ),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 15,
@@ -88,36 +92,51 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ),
               ),
               const SizedBox(height: 28),
-              const _Feature(
+              _Feature(
                 icon: Icons.shelves,
-                title: '나만의 진열장',
-                text: '원목장, 바 진열장, 박물관 케이스. 길게 눌러 끌면 자리를 바꿔요.',
+                title: tr('나만의 진열장', 'Your own cabinet'),
+                text: tr(
+                  '원목장, 바 진열장, 박물관 케이스. 길게 눌러 끌면 자리를 바꿔요.',
+                  'Wood cabinet, back bar or museum cases. Long-press and drag to rearrange.',
+                ),
               ),
-              const _Feature(
+              _Feature(
                 icon: Icons.photo_camera_outlined,
-                title: '병 사진으로 바로 기록',
-                text: '배경을 지워 진열장에 세우고, 라벨을 읽어 이름을 채워요.',
+                title: tr('병 사진으로 바로 기록', 'Snap the bottle'),
+                text: tr(
+                  '배경을 지워 진열장에 세우고, 라벨을 읽어 이름을 채워요.',
+                  'The background is removed so the bottle stands on your shelf, and the label fills in the name.',
+                ),
               ),
-              const _Feature(
+              _Feature(
                 icon: Icons.radar,
-                title: '향 · 맛 · 개성 테이스팅 노트',
-                text: '차트를 눌러 강도를 정하고, 마신 날마다 이야기를 남겨요.',
+                title: tr(
+                  '향 · 맛 · 개성 테이스팅 노트',
+                  'Nose · palate · character notes',
+                ),
+                text: tr(
+                  '차트를 눌러 강도를 정하고, 마신 날마다 이야기를 남겨요.',
+                  'Tap the charts to rate intensity and add a story every time you pour.',
+                ),
               ),
-              const _Feature(
+              _Feature(
                 icon: Icons.auto_stories_outlined,
                 title: 'Memory Library',
-                text: '다 마신 병은 지우지 않고 빈 병 전시장에 추억으로 남아요.',
+                text: tr(
+                  '다 마신 병은 지우지 않고 빈 병 전시장에 추억으로 남아요.',
+                  'Finished bottles are not deleted — they live on in your empty-bottle gallery.',
+                ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
               FilledButton.icon(
                 onPressed: _busy ? null : () => _start(samples: false),
                 icon: const Icon(Icons.add),
-                label: const Text('첫 병 진열하기'),
+                label: Text(tr('첫 병 진열하기', 'Add your first bottle')),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(54),
                 ),
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: 10),
               OutlinedButton.icon(
                 onPressed: _busy ? null : () => _start(samples: true),
                 icon: _busy
@@ -127,14 +146,17 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.visibility_outlined),
-                label: const Text('샘플 위스키로 둘러보기'),
+                label: Text(tr('샘플 위스키로 둘러보기', 'Explore with sample whiskies')),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(50),
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(
-                '샘플은 설정에서 언제든 지울 수 있어요.',
+              Text(
+                tr(
+                  '샘플은 설정에서 언제든 지울 수 있어요.',
+                  'You can remove the samples in Settings at any time.',
+                ),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: NoteColors.faint),
               ),

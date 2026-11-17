@@ -3,6 +3,8 @@
 /// 항목 구성은 손으로 쓰던 "Whiskey Tasting Note" PDF 양식을 그대로 따릅니다.
 library;
 
+import '../l10n/tr.dart';
+
 /// 위스키 종류 (만드는 방식).
 enum WhiskyType {
   singleMalt('Single Malt'),
@@ -98,31 +100,97 @@ enum WhiskyOrigin {
 
 /// 레이더 차트의 축 하나 (예: 곡물). [examples]는 (?) 버튼을 누르면 보이는 예시입니다.
 class FlavorAxis {
-  const FlavorAxis(this.label, [this.examples = const []]);
-  final String label;
-  final List<String> examples;
+  const FlavorAxis(
+    this.ko,
+    this.en, [
+    this.examplesKo = const [],
+    this.examplesEn = const [],
+  ]);
+  final String ko;
+  final String en;
+  final List<String> examplesKo;
+  final List<String> examplesEn;
+
+  String get label => tr(ko, en);
+  List<String> get examples => tr.ko ? examplesKo : examplesEn;
 }
 
 /// 향(Nose)과 비후방 후각(Retronasal)에 쓰는 8개 축. 위에서부터 시계방향.
 const aromaAxes = <FlavorAxis>[
-  FlavorAxis('곡물', ['밀가루', '호밀빵', '쌀', '끓인 곡물']),
-  FlavorAxis('과일', ['말린 과일', '익힌 과일', '신선한 과일', '시트러스', '포도', '사과', '레몬', '배']),
-  FlavorAxis('꽃', ['꽃향', '식물', '건초', '풀']),
-  FlavorAxis('나무', ['오래된', '마른', '젖은', '쪼개진', '새 가구']),
-  FlavorAxis('이탄', ['병원', '훈제', '이끼', '요오드', '타지 않은 숯향', '타고 남은 숯향']),
-  FlavorAxis('아로마', ['바닐라', '너트', '아세톤']),
-  FlavorAxis('질감', ['꿀', '초콜릿', '오일', '풋풋함', '버터']),
-  FlavorAxis('기타', ['황', '플라스틱', '가죽', '담배', '고무', '흙']),
+  FlavorAxis(
+    '곡물',
+    'Grain',
+    ['밀가루', '호밀빵', '쌀', '끓인 곡물'],
+    ['Flour', 'Rye bread', 'Rice', 'Cooked grain'],
+  ),
+  FlavorAxis(
+    '과일',
+    'Fruit',
+    ['말린 과일', '익힌 과일', '신선한 과일', '시트러스', '포도', '사과', '레몬', '배'],
+    [
+      'Dried fruit',
+      'Cooked fruit',
+      'Fresh fruit',
+      'Citrus',
+      'Grape',
+      'Apple',
+      'Lemon',
+      'Pear',
+    ],
+  ),
+  FlavorAxis(
+    '꽃',
+    'Floral',
+    ['꽃향', '식물', '건초', '풀'],
+    ['Blossom', 'Plants', 'Hay', 'Grass'],
+  ),
+  FlavorAxis(
+    '나무',
+    'Wood',
+    ['오래된', '마른', '젖은', '쪼개진', '새 가구'],
+    ['Old', 'Dry', 'Wet', 'Split', 'New furniture'],
+  ),
+  FlavorAxis(
+    '이탄',
+    'Peat',
+    ['병원', '훈제', '이끼', '요오드', '타지 않은 숯향', '타고 남은 숯향'],
+    [
+      'Medicinal',
+      'Smoked',
+      'Moss',
+      'Iodine',
+      'Unburnt charcoal',
+      'Burnt charcoal',
+    ],
+  ),
+  FlavorAxis(
+    '아로마',
+    'Aroma',
+    ['바닐라', '너트', '아세톤'],
+    ['Vanilla', 'Nuts', 'Acetone'],
+  ),
+  FlavorAxis(
+    '질감',
+    'Texture',
+    ['꿀', '초콜릿', '오일', '풋풋함', '버터'],
+    ['Honey', 'Chocolate', 'Oil', 'Green', 'Butter'],
+  ),
+  FlavorAxis(
+    '기타',
+    'Other',
+    ['황', '플라스틱', '가죽', '담배', '고무', '흙'],
+    ['Sulphur', 'Plastic', 'Leather', 'Tobacco', 'Rubber', 'Earth'],
+  ),
 ];
 
 /// 맛(Palate)에 쓰는 6개 축. 위에서부터 시계방향.
 const palateAxes = <FlavorAxis>[
-  FlavorAxis('단맛'),
-  FlavorAxis('신맛'),
-  FlavorAxis('짠맛'),
-  FlavorAxis('감칠맛'),
-  FlavorAxis('지방맛'),
-  FlavorAxis('쓴맛'),
+  FlavorAxis('단맛', 'Sweet'),
+  FlavorAxis('신맛', 'Sour'),
+  FlavorAxis('짠맛', 'Salty'),
+  FlavorAxis('감칠맛', 'Umami'),
+  FlavorAxis('지방맛', 'Fatty'),
+  FlavorAxis('쓴맛', 'Bitter'),
 ];
 
 /// 레이더 차트 값의 최대치 (PDF의 동심원 개수).
@@ -130,21 +198,32 @@ const radarMax = 10;
 
 /// 개성(Characters) 막대 하나: 왼쪽 ↔ 오른쪽.
 class CharacterScale {
-  const CharacterScale(this.key, this.left, this.right);
+  const CharacterScale(
+    this.key,
+    this.leftKo,
+    this.rightKo,
+    this.leftEn,
+    this.rightEn,
+  );
   final String key;
-  final String left;
-  final String right;
+  final String leftKo;
+  final String rightKo;
+  final String leftEn;
+  final String rightEn;
+
+  String get left => tr(leftKo, leftEn);
+  String get right => tr(rightKo, rightEn);
 }
 
 const characterScales = <CharacterScale>[
-  CharacterScale('dryOily', '드라이', '오일리'),
-  CharacterScale('lightHeavy', '가벼운', '무거운'),
-  CharacterScale('mildSpicy', '순한', '매운'),
-  CharacterScale('smoothIntense', '부드러운', '강렬한'),
+  CharacterScale('dryOily', '드라이', '오일리', 'Dry', 'Oily'),
+  CharacterScale('lightHeavy', '가벼운', '무거운', 'Light', 'Heavy'),
+  CharacterScale('mildSpicy', '순한', '매운', 'Mild', 'Spicy'),
+  CharacterScale('smoothIntense', '부드러운', '강렬한', 'Smooth', 'Intense'),
 ];
 
 /// 여운(피니시) 막대: 짧다 ↔ 길다.
-const finishScale = CharacterScale('finish', '짧다', '길다');
+const finishScale = CharacterScale('finish', '짧다', '길다', 'Short', 'Long');
 
 /// 개성 막대의 칸 수 (PDF 기준 9칸, 값은 1~9).
 const scaleSteps = 9;

@@ -13,6 +13,7 @@ import 'note_edit_screen.dart';
 import 'memory_library_screen.dart';
 import 'settings_screen.dart';
 import 'stats_screen.dart';
+import '../l10n/tr.dart';
 
 /// 첫 화면: 내 위스키 진열장 (또는 목록).
 class NoteListScreen extends StatefulWidget {
@@ -168,7 +169,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${all.length}병',
+                  tr.bottles(all.length),
                   style: const TextStyle(
                     fontSize: 13,
                     color: NoteColors.hint,
@@ -217,7 +218,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
       child: Row(
         children: [
           _RoundIconButton(
-            tooltip: '통계',
+            tooltip: tr('통계', 'Statistics'),
             icon: Icons.insights_outlined,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(
@@ -227,13 +228,15 @@ class _NoteListScreenState extends State<NoteListScreen> {
           ),
           const SizedBox(width: 8),
           _RoundIconButton(
-            tooltip: _cabinet ? '목록으로 보기' : '진열장으로 보기',
+            tooltip: _cabinet
+                ? tr('목록으로 보기', 'List view')
+                : tr('진열장으로 보기', 'Cabinet view'),
             icon: _cabinet ? Icons.view_agenda_outlined : Icons.shelves,
             onPressed: () => setState(() => _cabinet = !_cabinet),
           ),
           const SizedBox(width: 8),
           _RoundIconButton(
-            tooltip: '설정',
+            tooltip: tr('설정', 'Settings'),
             icon: Icons.settings_outlined,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(
@@ -277,7 +280,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
       onChanged: (v) => setState(() => _query = v.trim()),
       decoration: InputDecoration(
         prefixIcon: const Icon(Icons.search, size: 20),
-        hintText: '이름, 지역, 종류로 검색',
+        hintText: tr('이름, 지역, 종류로 검색', 'Search name, region, type'),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
           borderSide: BorderSide.none,
@@ -313,7 +316,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
-          pill('전체', _origin == null && _type == null, () {
+          pill(tr('전체', 'All'), _origin == null && _type == null, () {
             setState(() {
               _origin = null;
               _type = null;
@@ -487,10 +490,13 @@ class _NoMatch extends StatelessWidget {
   const _NoMatch();
 
   @override
-  Widget build(BuildContext context) => const Center(
+  Widget build(BuildContext context) => Center(
     child: Padding(
       padding: EdgeInsets.all(24),
-      child: Text('찾는 위스키가 없어요', style: TextStyle(color: NoteColors.hint)),
+      child: Text(
+        tr('찾는 위스키가 없어요', 'No whisky matches'),
+        style: TextStyle(color: NoteColors.hint),
+      ),
     ),
   );
 }
@@ -516,8 +522,8 @@ class _EmptyState extends StatelessWidget {
           child: const Icon(Icons.local_bar, size: 30, color: NoteColors.ink),
         ),
         const SizedBox(height: 16),
-        const Text(
-          '아직 기록한 위스키가 없습니다',
+        Text(
+          tr('아직 기록한 위스키가 없습니다', 'No whiskies yet'),
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w700,
@@ -525,8 +531,11 @@ class _EmptyState extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
-          '왼쪽 위 + 버튼으로 첫 병을 진열해 보세요.',
+        Text(
+          tr(
+            '오른쪽 위 + 버튼으로 첫 병을 진열해 보세요.',
+            'Tap + at the top right to shelve your first bottle.',
+          ),
           textAlign: TextAlign.center,
           style: TextStyle(color: NoteColors.hint),
         ),

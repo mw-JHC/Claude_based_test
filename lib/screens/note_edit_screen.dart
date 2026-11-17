@@ -16,6 +16,7 @@ import '../widgets/note_photo.dart';
 import '../widgets/origin_picker.dart';
 import '../widgets/sheet_section.dart';
 import 'bottle_camera_screen.dart';
+import '../l10n/tr.dart';
 
 /// 새 노트 작성 / 기존 노트 수정 화면. PDF 양식 순서를 따릅니다.
 class NoteEditScreen extends StatefulWidget {
@@ -94,7 +95,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
       );
       if (x != null) await _usePhoto(x.path);
     } catch (e) {
-      _snack('사진을 가져오지 못했습니다: $e');
+      _snack(tr('사진을 가져오지 못했습니다: $e', 'Could not load the photo: $e'));
     }
   }
 
@@ -124,8 +125,16 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
       _labelWords = guess.words;
     });
     final parts = [
-      if (cutout == null) '이 기기에서는 배경을 지우지 못해 원본 사진을 씁니다.',
-      if (filled.isNotEmpty) '라벨에서 ${filled.join(', ')}을(를) 읽었어요. 틀리면 고쳐 주세요.',
+      if (cutout == null)
+        tr(
+          '이 기기에서는 배경을 지우지 못해 원본 사진을 씁니다.',
+          'Background removal is not available here, so the original photo is used.',
+        ),
+      if (filled.isNotEmpty)
+        tr(
+          '라벨에서 ${filled.join(', ')}을(를) 읽었어요. 틀리면 고쳐 주세요.',
+          'Read ${filled.join(', ')} from the label. Please correct anything that is off.',
+        ),
     ];
     if (parts.isNotEmpty) _snack(parts.join('\n'));
   }
@@ -135,21 +144,21 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     final filled = <String>[];
     if (_name.text.trim().isEmpty && g.name != null) {
       _name.text = g.name!;
-      filled.add('이름 "${g.name}"');
+      filled.add(tr('이름 "${g.name}"', 'name "${g.name}"'));
     }
     if (_ageCask.text.trim().isEmpty && g.age != null) {
-      _ageCask.text = '${g.age}년';
-      filled.add('숙성 ${g.age}년');
+      _ageCask.text = tr.age(g.age!);
+      filled.add(tr('숙성 ${g.age}년', 'age ${g.age}'));
     }
     if (_note.origin == null && g.origin != null) {
       _note
         ..origin = g.origin
         ..subRegion = g.subRegion;
-      filled.add('산지');
+      filled.add(tr('산지', 'origin'));
     }
     if (_note.type == null && g.type != null) {
       _note.type = g.type;
-      filled.add('종류');
+      filled.add(tr('종류', 'type'));
     }
     return filled;
   }
@@ -175,25 +184,34 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     final onShelf = same.where((n) => !n.isEmpty).length;
     final emptied = widget.store.emptiedWithName(_name.text);
     final where = [
-      if (onShelf > 0) '진열장에 $onShelf병',
-      if (emptied > 0) 'Memory Library에 빈 병 $emptied병',
+      if (onShelf > 0)
+        tr('진열장에 $onShelf병', '${tr.bottles(onShelf)} in the cabinet'),
+      if (emptied > 0)
+        tr(
+          'Memory Library에 빈 병 $emptied병',
+          '${tr.bottles(emptied)} in the Memory Library',
+        ),
     ].join(', ');
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('이미 있는 위스키예요'),
+        title: Text(tr('이미 있는 위스키예요', 'You already have this whisky')),
         content: Text(
-          '"${_name.text.trim()}"이(가) $where 있어요.\n'
-          '같은 병을 하나 더 진열장에 놓을까요?',
+          tr(
+            '"${_name.text.trim()}"이(가) $where 있어요.\n'
+                '같은 병을 하나 더 진열장에 놓을까요?',
+            'You already have "${_name.text.trim()}": $where.\n'
+                'Add another bottle of it to the cabinet?',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c, false),
-            child: const Text('취소'),
+            child: Text(tr('취소', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('그래도 추가'),
+            child: Text(tr('그래도 추가', 'Add anyway')),
           ),
         ],
       ),
@@ -203,8 +221,13 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
 
   Future<void> _save() async {
     if (_name.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('위스키 이름을 입력해 주세요.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            tr('위스키 이름을 입력해 주세요.', 'Please enter the whisky name.'),
+          ),
+        ),
+      );
       return;
     }
     // 새로 추가하는데 같은 이름이 이미 있으면 알려 주고, 그래도 추가할지 묻습니다.
@@ -237,8 +260,9 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('저장하지 못했습니다: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr('저장하지 못했습니다: $e', 'Could not save: $e'))),
+      );
     }
   }
 
@@ -264,7 +288,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
         title: Text(isNew ? 'New Whisky' : 'Edit Note'),
         actions: [
           IconButton(
-            tooltip: '저장',
+            tooltip: tr('저장', 'Save'),
             onPressed: _saving ? null : _save,
             icon: const Icon(Icons.check),
           ),
@@ -287,7 +311,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.check),
-            label: Text(isNew ? '진열장에 저장' : '변경 사항 저장'),
+            label: Text(
+              isNew
+                  ? tr('진열장에 저장', 'Add to cabinet')
+                  : tr('변경 사항 저장', 'Save changes'),
+            ),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
             ),
@@ -369,8 +397,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                 controller: _overall,
                 minLines: 4,
                 maxLines: null,
-                decoration: const InputDecoration(
-                  hintText: '전체적인 인상, 같이 마신 사람, 다시 살지 …',
+                decoration: InputDecoration(
+                  hintText: tr(
+                    '전체적인 인상, 같이 마신 사람, 다시 살지 …',
+                    'Overall impression, who you shared it with, would you buy it again …',
+                  ),
                 ),
               ),
             ),
@@ -455,7 +486,12 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
               ),
             ],
           ),
-          field(_price, '가격', 'Price', hint: '예: €65 / 70cl'),
+          field(
+            _price,
+            '가격',
+            'Price',
+            hint: tr('예: €65 / 70cl', 'e.g. €65 / 70cl'),
+          ),
         ],
       ),
     );
@@ -466,8 +502,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          '라벨에서 읽은 글자 (누르면 이름에 덧붙여요)',
+        Text(
+          tr(
+            '라벨에서 읽은 글자 (누르면 이름에 덧붙여요)',
+            'Text read from the label (tap to add to the name)',
+          ),
           style: TextStyle(fontSize: 12, color: NoteColors.hint),
         ),
         const SizedBox(height: 4),
@@ -505,13 +544,16 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                 borderRadius: BorderRadius.circular(18),
               ),
               alignment: Alignment.center,
-              child: const Column(
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   CircularProgressIndicator(color: NoteColors.gold),
                   SizedBox(height: 12),
                   Text(
-                    '병만 오려내고 라벨을 읽는 중…',
+                    tr(
+                      '병만 오려내고 라벨을 읽는 중…',
+                      'Cutting out the bottle and reading the label…',
+                    ),
                     style: TextStyle(color: NoteColors.gold),
                   ),
                 ],
@@ -532,16 +574,16 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: SegmentedButton<bool>(
-                  segments: const [
+                  segments: [
                     ButtonSegment(
                       value: true,
                       icon: Icon(Icons.auto_awesome),
-                      label: Text('병만 (진열장용)'),
+                      label: Text(tr('병만 (진열장용)', 'Bottle only (cabinet)')),
                     ),
                     ButtonSegment(
                       value: false,
                       icon: Icon(Icons.image_outlined),
-                      label: Text('원본 사진'),
+                      label: Text(tr('원본 사진', 'Original photo')),
                     ),
                   ],
                   selected: {_useCutout},
@@ -565,7 +607,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                   ),
                   border: Border.all(color: NoteColors.line),
                 ),
-                child: const Column(
+                child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
@@ -575,7 +617,10 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                     ),
                     SizedBox(height: 10),
                     Text(
-                      '병을 찍으면 배경을 지워 진열장에 세우고\n라벨을 읽어 이름과 숙성 연수를 채워 드려요',
+                      tr(
+                        '병을 찍으면 배경을 지워 진열장에 세우고\n라벨을 읽어 이름과 숙성 연수를 채워 드려요',
+                        'Snap the bottle: the background is removed for your cabinet\nand the label fills in the name and age',
+                      ),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: NoteColors.hint,
@@ -594,7 +639,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                 child: FilledButton.icon(
                   onPressed: _processing ? null : _takePhoto,
                   icon: const Icon(Icons.photo_camera),
-                  label: const Text('병 촬영'),
+                  label: Text(tr('병 촬영', 'Snap bottle')),
                 ),
               ),
               const SizedBox(width: 8),
@@ -602,13 +647,13 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _processing ? null : _pickFromGallery,
                   icon: const Icon(Icons.photo_library),
-                  label: const Text('갤러리'),
+                  label: Text(tr('갤러리', 'Gallery')),
                 ),
               ),
               if (photo != null && !_processing) ...[
                 const SizedBox(width: 4),
                 IconButton(
-                  tooltip: '사진 삭제',
+                  tooltip: tr('사진 삭제', 'Remove photo'),
                   onPressed: () => setState(() {
                     _pickedPhoto = null;
                     _pickedCutout = null;

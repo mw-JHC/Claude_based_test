@@ -10,8 +10,12 @@ import 'package:whisky_note/screens/note_detail_screen.dart';
 import 'package:whisky_note/widgets/cabinet_view.dart';
 import 'package:whisky_note/widgets/flavor_wheel.dart';
 import 'package:whisky_note/widgets/whisky_bottle.dart';
+import 'package:whisky_note/l10n/tr.dart';
 
 void main() {
+  // 이 테스트들은 한국어 화면 기준으로 씁니다.
+  setUp(() => tr.language = AppLanguage.ko);
+
   test('노트를 JSON으로 저장했다가 그대로 다시 읽을 수 있다', () {
     final note = TastingNote(
       id: '1',
@@ -45,7 +49,10 @@ void main() {
     addTearDown(tester.view.reset);
 
     // 환영 화면은 이미 본 것으로
-    SharedPreferences.setMockInitialValues({'onboarded': true});
+    SharedPreferences.setMockInitialValues({
+      'onboarded': true,
+      'language': 'ko',
+    });
     final settings = await AppSettings.load();
     final store = NoteStore(MemoryNoteStorage());
     await tester.pumpWidget(WhiskyNoteApp(store: store, settings: settings));
@@ -85,7 +92,7 @@ void main() {
     expect(settings.cabinetStyle, CabinetStyle.museum);
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('cabinetStyle'), 'museum');
-    await tester.pageBack();
+    await tester.tap(find.byType(BackButton).last);
     await tester.pumpAndSettle();
     // 박물관 케이스는 받침대에 비친 반사까지 그려서 병이 두 번 나온다 (첫 번째가 실제 병).
     await tester.tap(find.byType(WhiskyBottle).first);

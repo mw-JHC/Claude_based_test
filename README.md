@@ -10,6 +10,15 @@
 - 개인정보처리방침: [store/PRIVACY.md](store/PRIVACY.md)
 - 스토어 이미지: `store/icon_512.png`, `store/feature_graphic.jpg`, `store/screenshots/`
 
+## 언어
+
+화면은 **영어(기본)와 한국어**를 지원합니다. 설정 맨 위 **Language**에서 바꿉니다.
+
+- 번역은 쓰는 곳에서 `tr('한글', 'English')`로 나란히 적습니다 (`lib/l10n/tr.dart`). 병 수, 날짜, 숙성 연수도 언어에 맞게 씁니다.
+- 한국어 화면의 "한글 *English*" 이름표(`BiLabel`, 칸 제목)는 영어 화면에서는 영어만 보입니다.
+- 날짜 선택 창, 라이선스 화면 같은 기본 화면도 언어를 따릅니다.
+- 언어를 바꾸면 앱이 새 언어로 첫 화면부터 다시 그려집니다.
+
 ## 디자인
 
 어두운 위스키 라운지 분위기의 다크 테마입니다. 호박색/구리색 포인트, 둥근 카드, 제목과 위스키 이름에는 세리프 폰트(Playfair Display, SIL OFL)를 씁니다. 색과 공통 스타일은 `lib/theme.dart`에 모여 있습니다.

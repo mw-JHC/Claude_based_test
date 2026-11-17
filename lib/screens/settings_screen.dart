@@ -13,6 +13,7 @@ import '../data/sample_data.dart';
 import '../theme.dart';
 import '../widgets/cabinet_view.dart';
 import '../widgets/sheet_section.dart';
+import '../l10n/tr.dart';
 
 /// 설정 화면. 진열장 분위기를 고릅니다.
 class SettingsScreen extends StatelessWidget {
@@ -34,6 +35,20 @@ class SettingsScreen extends StatelessWidget {
         builder: (context, _) => ListView(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
           children: [
+            SheetSection(
+              title: '언어',
+              subtitle: 'Language',
+              child: SegmentedButton<AppLanguage>(
+                showSelectedIcon: false,
+                segments: [
+                  for (final l in AppLanguage.values)
+                    ButtonSegment(value: l, label: Text(l.nativeName)),
+                ],
+                selected: {settings.language},
+                // 바꾸면 앱 전체가 새 언어로 다시 그려집니다.
+                onSelectionChanged: (v) => settings.setLanguage(v.first),
+              ),
+            ),
             SheetSection(
               title: '진열장 분위기',
               subtitle: 'Cabinet',
@@ -99,9 +114,13 @@ class _SampleButtonsState extends State<_SampleButtons> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          '여러 산지·종류의 위스키 40병(빈 병 8병, 이야기 포함)을 넣어 기능을 시험해 볼 수 있어요. '
-          '지우기는 샘플만 지우고 직접 넣은 병은 그대로 둡니다.',
+        Text(
+          tr(
+            '여러 산지·종류의 위스키 40병(빈 병 8병, 이야기 포함)을 넣어 기능을 시험해 볼 수 있어요. '
+                '지우기는 샘플만 지우고 직접 넣은 병은 그대로 둡니다.',
+            'Add 40 whiskies from many origins and styles (8 empty, with stories) to try things out. '
+                'Removing them only deletes the samples, never your own bottles.',
+          ),
           style: TextStyle(color: NoteColors.hint, fontSize: 12.5, height: 1.5),
         ),
         const SizedBox(height: 12),
@@ -111,7 +130,10 @@ class _SampleButtonsState extends State<_SampleButtons> {
               child: FilledButton.icon(
                 onPressed: _busy
                     ? null
-                    : () => _run(addSampleWhiskies, '샘플 {n}병을 넣었어요.'),
+                    : () => _run(
+                        addSampleWhiskies,
+                        tr('샘플 {n}병을 넣었어요.', 'Added {n} sample bottles.'),
+                      ),
                 icon: _busy
                     ? const SizedBox(
                         width: 16,
@@ -119,7 +141,7 @@ class _SampleButtonsState extends State<_SampleButtons> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.playlist_add),
-                label: const Text('샘플 40병 넣기'),
+                label: Text(tr('샘플 40병 넣기', 'Add 40 samples')),
               ),
             ),
             const SizedBox(width: 8),
@@ -127,9 +149,12 @@ class _SampleButtonsState extends State<_SampleButtons> {
               child: OutlinedButton.icon(
                 onPressed: _busy
                     ? null
-                    : () => _run(removeSampleWhiskies, '샘플 {n}병을 지웠어요.'),
+                    : () => _run(
+                        removeSampleWhiskies,
+                        tr('샘플 {n}병을 지웠어요.', 'Removed {n} sample bottles.'),
+                      ),
                 icon: const Icon(Icons.delete_sweep_outlined),
-                label: const Text('샘플 지우기'),
+                label: Text(tr('샘플 지우기', 'Remove samples')),
               ),
             ),
           ],
@@ -274,7 +299,7 @@ class _BackupButtonsState extends State<_BackupButtons> {
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(file.path, mimeType: 'application/zip')],
-          subject: 'Whisky Library 백업',
+          subject: tr('Whisky Library 백업', 'Whisky Library backup'),
           // 태블릿에서 공유 창 위치
           sharePositionOrigin: box == null
               ? null
@@ -282,7 +307,9 @@ class _BackupButtonsState extends State<_BackupButtons> {
         ),
       );
     } catch (e) {
-      if (mounted) _snack('백업 파일을 만들지 못했어요: $e');
+      if (mounted) {
+        _snack(tr('백업 파일을 만들지 못했어요: $e', 'Could not create the backup: $e'));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -303,47 +330,55 @@ class _BackupButtonsState extends State<_BackupButtons> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (c) => AlertDialog(
-          title: const Text('백업에서 복원할까요?'),
+          title: Text(tr('백업에서 복원할까요?', 'Restore from backup?')),
           content: Text(
-            '백업 파일: 위스키 ${summary.notes}병, 사진 ${summary.photos}장'
-            '${summary.createdAt == null ? '' : '\n만든 날: ${_date(summary.createdAt!)}'}\n\n'
-            '지금 앱에 있는 기록은 모두 백업 내용으로 바뀝니다.',
+            tr(
+              '백업 파일: 위스키 ${summary.notes}병, 사진 ${summary.photos}장'
+                  '${summary.createdAt == null ? '' : '\n만든 날: ${tr.date(summary.createdAt!)}'}\n\n'
+                  '지금 앱에 있는 기록은 모두 백업 내용으로 바뀝니다.',
+              'Backup: ${tr.bottles(summary.notes)}, ${summary.photos} photos'
+                  '${summary.createdAt == null ? '' : '\nCreated: ${tr.date(summary.createdAt!)}'}\n\n'
+                  'Everything currently in the app will be replaced by the backup.',
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(c, false),
-              child: const Text('취소'),
+              child: Text(tr('취소', 'Cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(c, true),
-              child: const Text('복원'),
+              child: Text(tr('복원', 'Restore')),
             ),
           ],
         ),
       );
       if (ok != true) return;
       final count = await service.restore(bytes);
-      if (mounted) _snack('위스키 $count병을 복원했어요.');
+      if (mounted) {
+        _snack(tr('위스키 $count병을 복원했어요.', 'Restored ${tr.bottles(count)}.'));
+      }
     } on BackupException catch (e) {
       if (mounted) _snack(e.message);
     } catch (e) {
-      if (mounted) _snack('복원하지 못했어요: $e');
+      if (mounted) _snack(tr('복원하지 못했어요: $e', 'Could not restore: $e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
-
-  static String _date(DateTime d) =>
-      '${d.year}.${d.month.toString().padLeft(2, '0')}.${d.day.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          '기록은 이 폰 안에만 저장돼요. 폰을 바꾸거나 앱을 지우기 전에 백업 파일을 '
-          '만들어 Google Drive나 메일로 보관하세요. 사진과 이야기까지 모두 들어갑니다.',
+        Text(
+          tr(
+            '기록은 이 폰 안에만 저장돼요. 폰을 바꾸거나 앱을 지우기 전에 백업 파일을 '
+                '만들어 Google Drive나 메일로 보관하세요. 사진과 이야기까지 모두 들어갑니다.',
+            'Your notes live only on this phone. Before changing phones or uninstalling, '
+                'create a backup file and keep it in Google Drive or your mail. Photos and stories are included.',
+          ),
           style: TextStyle(color: NoteColors.hint, fontSize: 12.5, height: 1.5),
         ),
         const SizedBox(height: 12),
@@ -359,7 +394,7 @@ class _BackupButtonsState extends State<_BackupButtons> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.ios_share),
-                label: const Text('백업 만들기'),
+                label: Text(tr('백업 만들기', 'Create backup')),
               ),
             ),
             const SizedBox(width: 8),
@@ -367,7 +402,7 @@ class _BackupButtonsState extends State<_BackupButtons> {
               child: OutlinedButton.icon(
                 onPressed: _busy ? null : _import,
                 icon: const Icon(Icons.settings_backup_restore),
-                label: const Text('복원하기'),
+                label: Text(tr('복원하기', 'Restore')),
               ),
             ),
           ],
@@ -392,15 +427,19 @@ class _About extends StatelessWidget {
             Icons.local_bar_outlined,
             'Whisky Library',
             snap.hasData
-                ? '버전 ${snap.data!.version} (${snap.data!.buildNumber})'
+                ? '${tr('버전', 'Version')} ${snap.data!.version} (${snap.data!.buildNumber})'
                 : '',
           ),
         ),
         _row(
           Icons.lock_outline,
-          '개인정보',
-          '모든 기록과 사진은 이 폰에만 저장되고 어디에도 보내지 않아요. '
-              '사진 배경 지우기와 라벨 읽기도 폰 안에서 처리됩니다.',
+          tr('개인정보', 'Privacy'),
+          tr(
+            '모든 기록과 사진은 이 폰에만 저장되고 어디에도 보내지 않아요. '
+                '사진 배경 지우기와 라벨 읽기도 폰 안에서 처리됩니다.',
+            'All notes and photos stay on this phone and are never uploaded. '
+                'Background removal and label reading also run on the device.',
+          ),
         ),
         const SizedBox(height: 6),
         OutlinedButton.icon(
@@ -420,7 +459,7 @@ class _About extends StatelessWidget {
             ),
           ),
           icon: const Icon(Icons.description_outlined),
-          label: const Text('오픈소스 라이선스'),
+          label: Text(tr('오픈소스 라이선스', 'Open-source licences')),
         ),
       ],
     );

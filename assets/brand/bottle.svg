@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="liquid" x1="0" x2="1">
+      <stop offset="0" stop-color="#7a3d0c"/>
+      <stop offset="0.3" stop-color="#d48a2c"/>
+      <stop offset="0.45" stop-color="#f2b866"/>
+      <stop offset="0.7" stop-color="#c97a24"/>
+      <stop offset="1" stop-color="#6a3008"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" x2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.10"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.06"/>
+    </linearGradient>
+    <linearGradient id="cap" x1="0" x2="1">
+      <stop offset="0" stop-color="#1a0f08"/>
+      <stop offset="0.4" stop-color="#4a2c18"/>
+      <stop offset="1" stop-color="#140b06"/>
+    </linearGradient>
+    <linearGradient id="label" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6e7c4"/>
+      <stop offset="1" stop-color="#e2c88f"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.05"/>
+    </linearGradient>
+    <clipPath id="body">
+      <path d="M452 250 L572 250 L572 360 C572 400 660 410 660 470 L660 740 Q660 780 620 780 L404 780 Q364 780 364 740 L364 470 C364 410 452 400 452 360 Z"/>
+    </clipPath>
+  </defs>
+  <!-- 병 몸통 -->
+  <g clip-path="url(#body)">
+    <rect x="300" y="200" width="420" height="600" fill="url(#glass)"/>
+    <rect x="300" y="452" width="420" height="340" fill="url(#liquid)"/>
+    <rect x="300" y="450" width="420" height="6" fill="#ffd79a" opacity="0.8"/>
+    <rect x="392" y="300" width="22" height="460" rx="10" fill="url(#shine)"/>
+    <rect x="616" y="500" width="10" height="240" rx="5" fill="#fff" opacity="0.18"/>
+  </g>
+  <path d="M452 250 L572 250 L572 360 C572 400 660 410 660 470 L660 740 Q660 780 620 780 L404 780 Q364 780 364 740 L364 470 C364 410 452 400 452 360 Z"
+        fill="none" stroke="#2a1608" stroke-width="6"/>
+  <!-- 라벨 -->
+  <rect x="404" y="540" width="216" height="150" rx="10" fill="url(#label)" stroke="#c99a3e" stroke-width="5"/>
+  <path d="M444 600 L580 600" stroke="#8a5a20" stroke-width="7" stroke-linecap="round"/>
+  <path d="M470 632 L554 632" stroke="#b08040" stroke-width="5" stroke-linecap="round"/>
+  <!-- 뚜껑 -->
+  <rect x="440" y="190" width="144" height="72" rx="12" fill="url(#cap)"/>
+  <rect x="440" y="246" width="144" height="10" fill="#e8b45a"/>
+</svg>

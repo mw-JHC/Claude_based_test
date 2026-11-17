@@ -22,15 +22,17 @@ enum CabinetStyle {
 
 /// 앱 설정. 폰에 저장되어 앱을 다시 켜도 유지됩니다.
 class AppSettings extends ChangeNotifier {
-  AppSettings._(this._prefs, this._style);
+  AppSettings._(this._prefs, this._style, this._onboarded);
 
   static const _styleKey = 'cabinetStyle';
+  static const _onboardedKey = 'onboarded';
 
   static Future<AppSettings> load() async {
     final prefs = await SharedPreferences.getInstance();
     return AppSettings._(
       prefs,
       CabinetStyle.fromName(prefs.getString(_styleKey)),
+      prefs.getBool(_onboardedKey) ?? false,
     );
   }
 
@@ -38,6 +40,16 @@ class AppSettings extends ChangeNotifier {
   CabinetStyle _style;
 
   CabinetStyle get cabinetStyle => _style;
+
+  /// 처음 실행 때 보여주는 환영 화면을 봤는지
+  bool _onboarded;
+  bool get onboarded => _onboarded;
+
+  Future<void> setOnboarded() async {
+    _onboarded = true;
+    notifyListeners();
+    await _prefs.setBool(_onboardedKey, true);
+  }
 
   Future<void> setCabinetStyle(CabinetStyle style) async {
     if (style == _style) return;

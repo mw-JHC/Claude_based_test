@@ -44,7 +44,8 @@ void main() {
     tester.view.devicePixelRatio = 2.5;
     addTearDown(tester.view.reset);
 
-    SharedPreferences.setMockInitialValues({});
+    // 환영 화면은 이미 본 것으로
+    SharedPreferences.setMockInitialValues({'onboarded': true});
     final settings = await AppSettings.load();
     final store = NoteStore(MemoryNoteStorage());
     await tester.pumpWidget(WhiskyNoteApp(store: store, settings: settings));

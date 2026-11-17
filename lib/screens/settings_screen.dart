@@ -1,6 +1,13 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../data/app_settings.dart';
+import '../data/backup.dart';
 import '../data/note_store.dart';
 import '../data/sample_data.dart';
 import '../theme.dart';
@@ -43,9 +50,19 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
             SheetSection(
-              title: '테스트 데이터',
+              title: '백업 및 복원',
+              subtitle: 'Backup',
+              child: _BackupButtons(store: store),
+            ),
+            SheetSection(
+              title: '샘플 데이터',
               subtitle: 'Samples',
               child: _SampleButtons(store: store),
+            ),
+            const SheetSection(
+              title: '앱 정보',
+              subtitle: 'About',
+              child: _About(),
             ),
           ],
         ),
@@ -222,4 +239,224 @@ class _StyleOption extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 백업 파일 만들기(공유) / 백업 파일에서 복원.
+class _BackupButtons extends StatefulWidget {
+  const _BackupButtons({required this.store});
+
+  final NoteStore store;
+
+  @override
+  State<_BackupButtons> createState() => _BackupButtonsState();
+}
+
+class _BackupButtonsState extends State<_BackupButtons> {
+  bool _busy = false;
+
+  void _snack(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+
+  Future<void> _export() async {
+    setState(() => _busy = true);
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final bytes = await BackupService(widget.store)
+          .build(appVersion: info.version);
+      final d = DateTime.now();
+      final stamp =
+          '${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/WhiskyLibrary_backup_$stamp.zip');
+      await file.writeAsBytes(bytes, flush: true);
+      if (!mounted) return;
+      final box = context.findRenderObject() as RenderBox?;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'application/zip')],
+          subject: 'Whisky Library 백업',
+          // 태블릿에서 공유 창 위치
+          sharePositionOrigin: box == null
+              ? null
+              : box.localToGlobal(Offset.zero) & box.size,
+        ),
+      );
+    } catch (e) {
+      if (mounted) _snack('백업 파일을 만들지 못했어요: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _import() async {
+    final picked = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: const ['zip'],
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final service = BackupService(widget.store);
+      final summary = service.inspect(bytes);
+      if (!mounted) return;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('백업에서 복원할까요?'),
+          content: Text(
+            '백업 파일: 위스키 ${summary.notes}병, 사진 ${summary.photos}장'
+            '${summary.createdAt == null ? '' : '\n만든 날: ${_date(summary.createdAt!)}'}\n\n'
+            '지금 앱에 있는 기록은 모두 백업 내용으로 바뀝니다.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('복원'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      final count = await service.restore(bytes);
+      if (mounted) _snack('위스키 $count병을 복원했어요.');
+    } on BackupException catch (e) {
+      if (mounted) _snack(e.message);
+    } catch (e) {
+      if (mounted) _snack('복원하지 못했어요: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  static String _date(DateTime d) =>
+      '${d.year}.${d.month.toString().padLeft(2, '0')}.${d.day.toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          '기록은 이 폰 안에만 저장돼요. 폰을 바꾸거나 앱을 지우기 전에 백업 파일을 '
+          '만들어 Google Drive나 메일로 보관하세요. 사진과 이야기까지 모두 들어갑니다.',
+          style: TextStyle(color: NoteColors.hint, fontSize: 12.5, height: 1.5),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _busy ? null : _export,
+                icon: _busy
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.ios_share),
+                label: const Text('백업 만들기'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _busy ? null : _import,
+                icon: const Icon(Icons.settings_backup_restore),
+                label: const Text('복원하기'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// 앱 버전, 개인정보 안내, 오픈소스 라이선스.
+class _About extends StatelessWidget {
+  const _About();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FutureBuilder<PackageInfo>(
+          future: PackageInfo.fromPlatform(),
+          builder: (context, snap) => _row(
+            Icons.local_bar_outlined,
+            'Whisky Library',
+            snap.hasData
+                ? '버전 ${snap.data!.version} (${snap.data!.buildNumber})'
+                : '',
+          ),
+        ),
+        _row(
+          Icons.lock_outline,
+          '개인정보',
+          '모든 기록과 사진은 이 폰에만 저장되고 어디에도 보내지 않아요. '
+              '사진 배경 지우기와 라벨 읽기도 폰 안에서 처리됩니다.',
+        ),
+        const SizedBox(height: 6),
+        OutlinedButton.icon(
+          onPressed: () => showLicensePage(
+            context: context,
+            applicationName: 'Whisky Library',
+            applicationIcon: Padding(
+              padding: const EdgeInsets.all(12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.asset(
+                  'assets/brand/icon_full.png',
+                  width: 64,
+                  height: 64,
+                ),
+              ),
+            ),
+          ),
+          icon: const Icon(Icons.description_outlined),
+          label: const Text('오픈소스 라이선스'),
+        ),
+      ],
+    );
+  }
+
+  Widget _row(IconData icon, String title, String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: NoteColors.gold),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: NoteColors.text,
+                ),
+              ),
+              if (text.isNotEmpty)
+                Text(
+                  text,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    height: 1.5,
+                    color: NoteColors.hint,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }

@@ -22,6 +22,12 @@ abstract class NoteStorage {
 
   /// 저장된 사진을 화면에 그릴 수 있는 형태로 돌려줍니다.
   ImageProvider? image(String? name);
+
+  /// 백업용: 저장된 사진 파일 내용 (없으면 null)
+  Future<Uint8List?> readPhoto(String name);
+
+  /// 복원용: 사진 파일을 이 이름으로 저장
+  Future<void> writePhoto(String name, List<int> bytes);
 }
 
 /// 폰의 앱 전용 폴더에 JSON 파일과 사진을 저장합니다.
@@ -86,6 +92,18 @@ class FileNoteStorage implements NoteStorage {
   @override
   ImageProvider? image(String? name) =>
       name == null ? null : FileImage(File('${_photoDir.path}/$name'));
+
+  @override
+  Future<Uint8List?> readPhoto(String name) async {
+    final f = File('${_photoDir.path}/$name');
+    return await f.exists() ? f.readAsBytes() : null;
+  }
+
+  @override
+  Future<void> writePhoto(String name, List<int> bytes) async {
+    await _photoDir.create(recursive: true);
+    await File('${_photoDir.path}/$name').writeAsBytes(bytes, flush: true);
+  }
 }
 
 /// 테스트용: 메모리에만 저장합니다.
@@ -107,12 +125,24 @@ class MemoryNoteStorage implements NoteStorage {
   Future<String> importPhoto(String sourcePath, String noteId) async =>
       sourcePath;
 
+  /// 사진 내용 (테스트에서 백업/복원 확인용)
+  final Map<String, List<int>> photos = {};
+
   @override
-  Future<String> importBytes(
-    Uint8List bytes,
-    String noteId,
-    String ext,
-  ) async => '$noteId$ext';
+  Future<String> importBytes(Uint8List bytes, String noteId, String ext) async {
+    photos['$noteId$ext'] = bytes;
+    return '$noteId$ext';
+  }
+
+  @override
+  Future<Uint8List?> readPhoto(String name) async {
+    final b = photos[name];
+    return b == null ? null : Uint8List.fromList(b);
+  }
+
+  @override
+  Future<void> writePhoto(String name, List<int> bytes) async =>
+      photos[name] = bytes;
 
   @override
   Future<void> deletePhoto(String name) async {}
@@ -247,6 +277,20 @@ class NoteStore extends ChangeNotifier {
       for (final name in old.files.difference(note.files)) {
         await storage.deletePhoto(name);
       }
+    }
+    notifyListeners();
+  }
+
+  /// 복원: 지금 노트를 모두 [notes]로 바꿉니다. (사진은 미리 써 둬야 합니다)
+  Future<void> replaceAll(List<TastingNote> notes) async {
+    final keep = {for (final n in notes) ...n.files};
+    final drop = {for (final n in _notes) ...n.files}.difference(keep);
+    _notes
+      ..clear()
+      ..addAll(notes);
+    await storage.saveAll(_notes);
+    for (final name in drop) {
+      await storage.deletePhoto(name);
     }
     notifyListeners();
   }

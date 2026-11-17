@@ -482,7 +482,7 @@ class _Hero extends StatelessWidget {
         : whiskyColor(note.color!);
 
     // 배경을 지우지 않은 사진만 있으면 사진을 꽉 채워 보여줍니다.
-    if (cutout == null && photo != null) {
+    if (cutout == null && photo != null && !note.drawn) {
       return Stack(
         fit: StackFit.expand,
         children: [

@@ -293,6 +293,7 @@ class TastingNote {
     this.color,
     this.photo,
     this.cutout,
+    this.drawn = false,
     List<int>? nose,
     List<int>? palate,
     List<int>? retronasal,
@@ -356,6 +357,9 @@ class TastingNote {
   /// 배경을 지우고 병만 오려낸 PNG 파일 이름. 진열장에 이걸 세웁니다.
   String? cutout;
 
+  /// 사진이 있어도 진열장과 상세 화면에 그린 병을 보여줄지.
+  bool drawn;
+
   /// 향 / Nose (aromaAxes 순서, 각 0 ~ radarMax)
   final List<int> nose;
 
@@ -416,6 +420,7 @@ class TastingNote {
     'color': color,
     'photo': photo,
     'cutout': cutout,
+    if (drawn) 'drawn': true,
     'nose': nose,
     'palate': palate,
     'retronasal': retronasal,
@@ -474,6 +479,7 @@ class TastingNote {
       },
       photo: j['photo'] as String?,
       cutout: j['cutout'] as String?,
+      drawn: j['drawn'] == true,
       nose: _intList(j['nose']),
       palate: _intList(j['palate']),
       retronasal: _intList(j['retronasal']),

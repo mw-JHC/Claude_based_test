@@ -859,7 +859,8 @@ class _GlassShinePainter extends CustomPainter {
 }
 
 /// 진열장에 세우는 병. 배경을 지운 사진(cutout)이 있으면 실제 병 사진을,
-/// 없으면 그린 병을 보여줍니다.
+/// 없으면 그린 병을 보여줍니다. 노트에서 그린 병을 고르면([TastingNote.drawn])
+/// 사진이 있어도 인쇄된 라벨의 그린 병을 씁니다.
 ///
 /// [reflection]이 0보다 크면 유리 선반에 비친 반사를 병 아래에 그립니다.
 class BottleFigure extends StatelessWidget {
@@ -881,10 +882,10 @@ class BottleFigure extends StatelessWidget {
   final double reflectionOpacity;
 
   Widget _bottle() {
-    final c = cutout;
+    final c = note.drawn ? null : cutout;
     final drawn = WhiskyBottle(
       note: note,
-      photo: photo,
+      photo: note.drawn ? null : photo,
       width: height * 0.41,
       height: height,
     );

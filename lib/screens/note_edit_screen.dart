@@ -15,6 +15,7 @@ import '../widgets/flavor_wheel.dart';
 import '../widgets/note_photo.dart';
 import '../widgets/origin_picker.dart';
 import '../widgets/sheet_section.dart';
+import '../widgets/whisky_bottle.dart';
 import 'bottle_camera_screen.dart';
 import '../l10n/tr.dart';
 
@@ -54,8 +55,12 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   /// 새로 고른 사진에서 배경을 지운 병 (PNG).
   Uint8List? _pickedCutout;
 
-  /// 진열장에 배경을 지운 병을 쓸지, 원본 사진을 쓸지.
-  late bool _useCutout = _note.cutout != null;
+  /// 진열장과 상세 화면에 보여줄 병 모습: 오려낸 병 사진, 원본 사진, 그린 병.
+  late _Look _look = _note.drawn
+      ? _Look.drawn
+      : _note.cutout != null
+      ? _Look.cutout
+      : _Look.photo;
   bool _photoRemoved = false;
   bool _processing = false;
   bool _saving = false;
@@ -121,7 +126,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     setState(() {
       _processing = false;
       _pickedCutout = cutout;
-      _useCutout = cutout != null;
+      _look = cutout != null ? _Look.cutout : _Look.photo;
       _labelWords = guess.words;
     });
     final parts = [
@@ -245,16 +250,18 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
       final storage = widget.store.storage;
       if (_pickedPhoto != null) {
         _note.photo = await storage.importPhoto(_pickedPhoto!, _note.id);
-        _note.cutout = _pickedCutout != null && _useCutout
+        // 그린 병을 골라도 오려낸 사진은 남겨 두어 나중에 다시 바꿀 수 있게
+        _note.cutout = _pickedCutout != null && _look != _Look.photo
             ? await storage.importBytes(_pickedCutout!, _note.id, '.png')
             : null;
       } else if (_photoRemoved) {
         _note
           ..photo = null
           ..cutout = null;
-      } else if (!_useCutout) {
+      } else if (_look == _Look.photo) {
         _note.cutout = null;
       }
+      _note.drawn = _note.photo != null && _look == _Look.drawn;
       await widget.store.upsert(_note);
       if (mounted) Navigator.of(context).pop(_note);
     } catch (e) {
@@ -526,10 +533,33 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     ),
   );
 
+  /// 그린 병 미리보기: 지금 입력한 이름, 종류, 색으로 그립니다.
+  Widget _drawnPreview() {
+    final note = _note.copy()
+      ..name = _name.text.trim()
+      ..ageCask = _ageCask.text.trim()
+      ..drawn = true;
+    final glow = note.color == null
+        ? NoteColors.amber
+        : whiskyColor(note.color!);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: const Alignment(0, 0.1),
+          radius: 0.85,
+          colors: [glow.withValues(alpha: 0.4), NoteColors.ink],
+        ),
+      ),
+      child: Center(
+        child: WhiskyBottle(note: note, width: 240 * 0.41, height: 240),
+      ),
+    );
+  }
+
   Widget _photoSection() {
     final photo = _photoImage;
     final cutout = _cutoutImage;
-    final showCutout = _useCutout && cutout != null;
+    final showCutout = _look == _Look.cutout && cutout != null;
     return SheetSection(
       title: '병 사진',
       subtitle: 'Photo',
@@ -564,33 +594,57 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
               borderRadius: BorderRadius.circular(18),
               child: SizedBox(
                 height: 300,
-                child: NotePhoto(
-                  image: showCutout ? cutout : photo,
-                  cutout: showCutout,
-                ),
+                child: _look == _Look.drawn
+                    ? _drawnPreview()
+                    : NotePhoto(
+                        image: showCutout ? cutout : photo,
+                        cutout: showCutout,
+                      ),
               ),
             ),
-            if (cutout != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: SegmentedButton<bool>(
-                  segments: [
-                    ButtonSegment(
-                      value: true,
-                      icon: Icon(Icons.auto_awesome),
-                      label: Text(tr('병만 (진열장용)', 'Bottle only (cabinet)')),
-                    ),
-                    ButtonSegment(
-                      value: false,
-                      icon: Icon(Icons.image_outlined),
-                      label: Text(tr('원본 사진', 'Original photo')),
-                    ),
-                  ],
-                  selected: {_useCutout},
-                  onSelectionChanged: (v) =>
-                      setState(() => _useCutout = v.first),
+            const SizedBox(height: 8),
+            SegmentedButton<_Look>(
+              showSelectedIcon: false,
+              segments: [
+                if (cutout != null)
+                  ButtonSegment(
+                    value: _Look.cutout,
+                    icon: const Icon(Icons.auto_awesome, size: 18),
+                    label: Text(tr('병만', 'Bottle')),
+                  ),
+                ButtonSegment(
+                  value: _Look.photo,
+                  icon: const Icon(Icons.image_outlined, size: 18),
+                  label: Text(tr('원본', 'Photo')),
                 ),
-              ),
+                ButtonSegment(
+                  value: _Look.drawn,
+                  icon: const Icon(Icons.brush_outlined, size: 18),
+                  label: Text(tr('그린 병', 'Drawn')),
+                ),
+              ],
+              selected: {
+                _look == _Look.cutout && cutout == null ? _Look.photo : _look,
+              },
+              onSelectionChanged: (v) => setState(() => _look = v.first),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 6, left: 4, right: 4),
+              child: Text(switch (_look) {
+                _Look.cutout when cutout != null => tr(
+                  '배경을 지운 실제 병 사진을 진열장에 세웁니다.',
+                  'The real bottle, background removed, stands in your cabinet.',
+                ),
+                _Look.drawn => tr(
+                  '사진은 보관하고, 진열장에는 그린 병을 세웁니다.',
+                  'Your photo is kept, but the cabinet shows the drawn bottle.',
+                ),
+                _ => tr(
+                  '원본 사진을 라벨처럼 붙인 병을 진열장에 세웁니다.',
+                  'The cabinet shows a bottle wearing your photo as its label.',
+                ),
+              }, style: const TextStyle(color: NoteColors.hint, fontSize: 12)),
+            ),
           ] else
             // 사진이 없을 때: 눌러서 바로 촬영할 수 있는 빈 칸
             InkWell(
@@ -670,3 +724,6 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     );
   }
 }
+
+/// 진열장에 보여줄 병 모습
+enum _Look { cutout, photo, drawn }

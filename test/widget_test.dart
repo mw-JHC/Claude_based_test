@@ -52,7 +52,7 @@ void main() {
     await tester.pump();
     expect(find.text('아직 기록한 위스키가 없습니다'), findsOneWidget);
 
-    await tester.tap(find.text('Add Whisky'));
+    await tester.tap(find.byTooltip('Add Whisky'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.widgetWithText(TextField, '이름 / Name *'),
@@ -185,4 +185,45 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('2/'), findsOneWidget);
   });
+
+  for (final style in CabinetStyle.values) {
+    testWidgets('진열장(${style.label})에서 병을 길게 눌러 끌면 자리가 바뀐다', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 2.5;
+      addTearDown(tester.view.reset);
+      final store = NoteStore(MemoryNoteStorage());
+      final notes = [
+        for (final n in ['A', 'B', 'C']) TastingNote(id: n, name: n),
+      ];
+      List<String>? order;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CabinetView(
+              store: store,
+              notes: notes,
+              style: style,
+              onOpen: (_) {},
+              onReorder: (ids) => order = ids,
+            ),
+          ),
+        ),
+      );
+      // 끌 수 있는 병 (거울/유리 반사는 제외됨)
+      final bottles = find.byType(LongPressDraggable<String>);
+      expect(bottles, findsNWidgets(3));
+      final a = tester.getCenter(bottles.at(0));
+      final c = tester.getCenter(bottles.at(2));
+      final gesture = await tester.startGesture(a);
+      await tester.pump(const Duration(milliseconds: 600)); // 길게 누르기
+      for (var t = 1; t <= 10; t++) {
+        await gesture.moveTo(Offset.lerp(a, c, t / 10)!);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.pump(const Duration(milliseconds: 300));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(order, ['B', 'C', 'A']);
+    });
+  }
 }

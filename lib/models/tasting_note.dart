@@ -221,6 +221,7 @@ class TastingNote {
     this.finish = scaleDefault,
     this.overall = '',
     this.emptiedAt,
+    this.order = 0,
     List<StoryEntry>? stories,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -293,6 +294,9 @@ class TastingNote {
   /// 총평 / Overall
   String overall;
 
+  /// 진열장에서의 자리 (작을수록 앞). 끌어서 놓으면 바뀝니다.
+  int order;
+
   /// 병을 비운 날. 값이 있으면 진열장 대신 Memory Library에 놓입니다.
   DateTime? emptiedAt;
   bool get isEmpty => emptiedAt != null;
@@ -336,6 +340,7 @@ class TastingNote {
     'finish': finish,
     'overall': overall,
     'emptiedAt': emptiedAt?.toIso8601String(),
+    'order': order,
     'stories': [for (final s in stories) s.toJson()],
     // 색상 값의 범위 버전 (1: 예전 0~2, 2: 지금 0~1)
     'colorScale': 2,
@@ -394,6 +399,7 @@ class TastingNote {
       finish: (j['finish'] as num?)?.toInt() ?? scaleDefault,
       overall: j['overall'] as String? ?? '',
       emptiedAt: DateTime.tryParse(j['emptiedAt'] as String? ?? ''),
+      order: (j['order'] as num?)?.toInt() ?? 0,
       stories: [
         for (final e in (j['stories'] as List? ?? const []))
           StoryEntry.fromJson(Map<String, dynamic>.from(e as Map)),

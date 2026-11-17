@@ -79,7 +79,6 @@ class MemoryLibraryScreen extends StatelessWidget {
                       store: store,
                       notes: memories,
                       style: settings.cabinetStyle,
-                      showFooter: false,
                       onOpen: (n) => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) =>

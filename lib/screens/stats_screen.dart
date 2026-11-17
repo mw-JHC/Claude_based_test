@@ -5,14 +5,31 @@ import '../models/tasting_note.dart';
 import '../theme.dart';
 import '../widgets/sheet_section.dart';
 
-/// 내 위스키 통계: 진열장과 빈 병이 어디 산인지, 무엇을 주로 마셨는지.
-class StatsScreen extends StatelessWidget {
+/// 내 위스키 통계: 순위, 진열장과 빈 병이 어디 산인지, 무엇을 주로 마셨는지.
+class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key, required this.store});
 
   final NoteStore store;
 
   @override
+  State<StatsScreen> createState() => _StatsScreenState();
+}
+
+/// 통계를 볼 범위
+enum _Scope { library, memory, total }
+
+/// 점수 순위 펼침 정도: 1위만 / 10위까지 / 전부
+enum _RankView { top1, top10, all }
+
+class _StatsScreenState extends State<StatsScreen> {
+  _Scope _scope = _Scope.library;
+  _RankView _rank = _RankView.top1;
+  bool _originsOpen = true;
+  bool _typesOpen = false;
+
+  @override
   Widget build(BuildContext context) {
+    final store = widget.store;
     return Scaffold(
       appBar: AppBar(title: const Text('Statistics')),
       body: ListenableBuilder(
@@ -35,6 +52,11 @@ class StatsScreen extends StatelessWidget {
               : scored.map((n) => n.score!).reduce((a, b) => a + b) /
                     scored.length;
           final stories = all.fold<int>(0, (s, n) => s + n.stories.length);
+          final scope = switch (_scope) {
+            _Scope.library => library,
+            _Scope.memory => memories,
+            _Scope.total => all,
+          };
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             children: [
@@ -53,41 +75,36 @@ class StatsScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 14),
-              SheetSection(
-                title: '진열장 산지',
-                subtitle: 'In the cabinet',
-                child: _Bars(_byOrigin(library)),
-              ),
-              SheetSection(
-                title: '진열장 종류',
-                subtitle: 'Types',
-                child: _Bars(_byType(library)),
-              ),
-              SheetSection(
-                title: '다 마신 병은 어디 산?',
-                subtitle: 'Emptied',
-                child: memories.isEmpty
-                    ? const Text(
-                        '아직 비운 병이 없어요.',
-                        style: TextStyle(color: NoteColors.hint),
-                      )
-                    : _Bars(_byOrigin(memories)),
-              ),
-              if (scored.isNotEmpty)
-                SheetSection(
-                  title: '최고 점수',
-                  subtitle: 'Top rated',
-                  child: Column(
-                    children: [
-                      for (final (i, n)
-                          in ([...scored]
-                                ..sort((a, b) => b.score!.compareTo(a.score!)))
-                              .take(5)
-                              .indexed)
-                        _RankRow(rank: i + 1, note: n),
-                    ],
+              _ranking(scored, all.length),
+              const SizedBox(height: 6),
+              SegmentedButton<_Scope>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(
+                    value: _Scope.library,
+                    label: Text('Whisky Library'),
                   ),
-                ),
+                  ButtonSegment(value: _Scope.memory, label: Text('Memory')),
+                  ButtonSegment(value: _Scope.total, label: Text('Total')),
+                ],
+                selected: {_scope},
+                onSelectionChanged: (v) => setState(() => _scope = v.first),
+              ),
+              const SizedBox(height: 14),
+              _Collapsible(
+                title: 'Origins',
+                subtitle: '산지',
+                open: _originsOpen,
+                onToggle: () => setState(() => _originsOpen = !_originsOpen),
+                bars: _byOrigin(scope),
+              ),
+              _Collapsible(
+                title: 'Type',
+                subtitle: '종류',
+                open: _typesOpen,
+                onToggle: () => setState(() => _typesOpen = !_typesOpen),
+                bars: _byType(scope),
+              ),
             ],
           );
         },
@@ -95,8 +112,79 @@ class StatsScreen extends StatelessWidget {
     );
   }
 
+  /// 점수 순위. 같은 점수는 같은 순위 (1, 2, 2, 4 …).
+  Widget _ranking(List<TastingNote> scored, int total) {
+    final ranked = [...scored]..sort((a, b) => b.score!.compareTo(a.score!));
+    final ranks = [
+      for (final n in ranked)
+        1 + ranked.where((o) => o.score! > n.score!).length,
+    ];
+    final shown = switch (_rank) {
+      _RankView.top1 => ranked.isEmpty ? 0 : ranks.where((r) => r == 1).length,
+      _RankView.top10 => ranks.where((r) => r <= 10).length,
+      _RankView.all => ranked.length,
+    };
+    final canExpand = shown < ranked.length;
+    return SheetSection(
+      title: '최고 점수',
+      subtitle: 'Top rated',
+      trailing: ranked.isEmpty
+          ? null
+          : IconButton(
+              tooltip: _rank == _RankView.top1 ? '10위까지 보기' : '접기',
+              visualDensity: VisualDensity.compact,
+              onPressed: () => setState(
+                () => _rank = _rank == _RankView.top1
+                    ? _RankView.top10
+                    : _RankView.top1,
+              ),
+              icon: AnimatedRotation(
+                turns: _rank == _RankView.top1 ? 0 : 0.5,
+                duration: const Duration(milliseconds: 200),
+                child: const Icon(Icons.keyboard_arrow_down),
+              ),
+            ),
+      child: ranked.isEmpty
+          ? const Text(
+              '점수를 매긴 위스키가 없어요.',
+              style: TextStyle(color: NoteColors.hint),
+            )
+          : AnimatedSize(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: Column(
+                children: [
+                  for (var i = 0; i < shown; i++)
+                    _RankRow(
+                      rank: ranks[i],
+                      tied: ranks.where((r) => r == ranks[i]).length > 1,
+                      note: ranked[i],
+                    ),
+                  if (_rank == _RankView.top10 && canExpand)
+                    TextButton(
+                      onPressed: () => setState(() => _rank = _RankView.all),
+                      child: Text('…  전체 ${ranked.length}병 순위 보기'),
+                    ),
+                  if (_rank != _RankView.top1 && scored.length < total)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        '점수 없는 ${total - scored.length}병은 순위에서 빠졌어요',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          color: NoteColors.faint,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+    );
+  }
+
   /// 산지별 병 수. Scotland는 세부 지역 분포도 함께.
-  static List<_Bar> _byOrigin(List<TastingNote> notes) {
+  List<_Bar> _byOrigin(List<TastingNote> notes) {
     final bars = <_Bar>[];
     for (final o in WhiskyOrigin.values) {
       final group = notes.where((n) => n.origin == o).toList();
@@ -118,7 +206,7 @@ class StatsScreen extends StatelessWidget {
     return bars..sort((a, b) => b.count.compareTo(a.count));
   }
 
-  static List<_Bar> _byType(List<TastingNote> notes) {
+  List<_Bar> _byType(List<TastingNote> notes) {
     final bars = [
       for (final t in WhiskyType.values)
         _Bar(t.label, notes.where((n) => n.type == t).length, ''),
@@ -258,9 +346,12 @@ class _Bars extends StatelessWidget {
 }
 
 class _RankRow extends StatelessWidget {
-  const _RankRow({required this.rank, required this.note});
+  const _RankRow({required this.rank, required this.note, this.tied = false});
 
   final int rank;
+
+  /// 같은 점수의 병이 더 있으면 "공동"
+  final bool tied;
   final TastingNote note;
 
   @override
@@ -271,15 +362,25 @@ class _RankRow extends StatelessWidget {
       child: Row(
         children: [
           SizedBox(
-            width: 26,
-            child: Text(
-              '$rank',
-              style: const TextStyle(
-                fontFamily: serif,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: NoteColors.gold,
-              ),
+            width: 40,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$rank',
+                  style: const TextStyle(
+                    fontFamily: serif,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: NoteColors.gold,
+                  ),
+                ),
+                if (tied)
+                  const Text(
+                    '공동',
+                    style: TextStyle(fontSize: 9.5, color: NoteColors.hint),
+                  ),
+              ],
             ),
           ),
           Expanded(
@@ -317,6 +418,104 @@ class _RankRow extends StatelessWidget {
               fontWeight: FontWeight.w700,
               color: NoteColors.text,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 접었다 폈다 하는 통계 칸. 접혀 있어도 상위 세 개를 한 줄로 보여줍니다.
+class _Collapsible extends StatelessWidget {
+  const _Collapsible({
+    required this.title,
+    required this.subtitle,
+    required this.open,
+    required this.onToggle,
+    required this.bars,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool open;
+  final VoidCallback onToggle;
+  final List<_Bar> bars;
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = bars
+        .take(3)
+        .map((b) => '${b.label} ${b.count}')
+        .join(' · ');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: NoteColors.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: NoteColors.line.withValues(alpha: 0.6)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: onToggle,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+              child: Row(
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontFamily: serif,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: NoteColors.text,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: NoteColors.hint,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      open ? '' : summary,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: NoteColors.hint,
+                      ),
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: open ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(
+                      Icons.keyboard_arrow_down,
+                      color: NoteColors.hint,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: open
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                    child: _Bars(bars),
+                  )
+                : const SizedBox(width: double.infinity),
           ),
         ],
       ),

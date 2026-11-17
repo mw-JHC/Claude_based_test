@@ -61,19 +61,17 @@ class _NoteListScreenState extends State<NoteListScreen> {
     ),
   );
 
+  void _add() => Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => NoteEditScreen(store: widget.store)),
+  );
+
+  void _reorder(List<String> ids) => widget.store.reorder(ids);
+
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => NoteEditScreen(store: store))),
-        icon: const Icon(Icons.add),
-        label: const Text('Add Whisky'),
-      ),
       body: SafeArea(
-        bottom: false,
         child: ListenableBuilder(
           listenable: Listenable.merge([store, widget.settings]),
           builder: (context, _) {
@@ -101,9 +99,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                             style: style,
                             notes: notes,
                             onOpen: _open,
-                            onPickStyle: _pickStyle,
-                            onOpenMemories: _openMemories,
-                            memoryCount: memoryCount,
+                            onReorder: _reorder,
                             emptyMessage: all.isEmpty
                                 ? const _EmptyState(onDark: true)
                                 : const _NoMatch(),
@@ -113,50 +109,34 @@ class _NoteListScreenState extends State<NoteListScreen> {
                       ? const _EmptyState()
                       : notes.isEmpty
                       ? const _NoMatch()
-                      : ListView.separated(
+                      // 목록에서도 길게 눌러 끌면 순서가 바뀝니다.
+                      : ReorderableListView.builder(
                           padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                           itemCount: notes.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, i) => _NoteCard(
-                            store: store,
-                            note: notes[i],
-                            onTap: () => _open(notes[i]),
+                          onReorderItem: (from, to) {
+                            final ids = notes.map((n) => n.id).toList();
+                            ids.insert(to, ids.removeAt(from));
+                            _reorder(ids);
+                          },
+                          proxyDecorator: (child, _, _) => Material(
+                            color: Colors.transparent,
+                            elevation: 12,
+                            shadowColor: Colors.black,
+                            borderRadius: BorderRadius.circular(20),
+                            child: child,
+                          ),
+                          itemBuilder: (context, i) => Padding(
+                            key: ValueKey(notes[i].id),
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _NoteCard(
+                              store: store,
+                              note: notes[i],
+                              onTap: () => _open(notes[i]),
+                            ),
                           ),
                         ),
                 ),
-                // 목록 보기에서도 Memory Library로 갈 수 있게
-                if (!_cabinet)
-                  SizedBox(
-                    height: 58,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 16, right: 176),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: OutlinedButton.icon(
-                          onPressed: _openMemories,
-                          icon: const Icon(
-                            Icons.auto_stories_outlined,
-                            size: 17,
-                          ),
-                          label: Text(
-                            memoryCount > 0
-                                ? 'Memories $memoryCount'
-                                : 'Memories',
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: NoteColors.gold,
-                            side: BorderSide(
-                              color: NoteColors.gold.withValues(alpha: 0.5),
-                            ),
-                            minimumSize: const Size(0, 38),
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            shape: const StadiumBorder(),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                _bottomBar(memoryCount),
               ],
             );
           },
@@ -166,27 +146,47 @@ class _NoteListScreenState extends State<NoteListScreen> {
   }
 
   Widget _header(List<TastingNote> all) {
-    final scored = all.where((n) => n.score != null).toList();
-    final avg = scored.isEmpty
-        ? null
-        : scored.map((n) => n.score!).reduce((a, b) => a + b) / scored.length;
-    final stats = [
-      '${all.length}병',
-      if (avg != null) '평균 ${avg.toStringAsFixed(0)}점',
-    ].join('  ·  ');
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 8, 10),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
       child: Row(
         children: [
+          // 새 병 추가: 늘 제목 옆 같은 자리에
+          Tooltip(
+            message: 'Add Whisky',
+            child: Semantics(
+              button: true,
+              label: 'Add Whisky',
+              child: Material(
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: Ink(
+                  decoration: const BoxDecoration(
+                    gradient: NoteColors.accentGradient,
+                  ),
+                  child: InkWell(
+                    onTap: _add,
+                    child: const SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Icon(Icons.add, color: NoteColors.ink, size: 26),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   'Whisky Library',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontFamily: serif,
-                    fontSize: 27,
+                    fontSize: 28,
                     fontWeight: FontWeight.w700,
                     height: 1.1,
                     color: NoteColors.text,
@@ -194,7 +194,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  stats,
+                  '${all.length}병',
                   style: const TextStyle(
                     fontSize: 13,
                     color: NoteColors.hint,
@@ -204,6 +204,18 @@ class _NoteListScreenState extends State<NoteListScreen> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// 아래 줄: 통계 · 보기 전환 · 설정 · Memories. 진열장/목록 어느 쪽이든 같은 자리.
+  Widget _bottomBar(int memoryCount) {
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
           _RoundIconButton(
             tooltip: '통계',
             icon: Icons.insights_outlined,
@@ -232,7 +244,28 @@ class _NoteListScreenState extends State<NoteListScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _openMemories,
+              icon: const Icon(Icons.auto_stories_outlined, size: 18),
+              label: Text(
+                memoryCount > 0 ? 'Memories  $memoryCount' : 'Memories',
+                overflow: TextOverflow.ellipsis,
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: NoteColors.gold,
+                side: BorderSide(color: NoteColors.gold.withValues(alpha: 0.5)),
+                minimumSize: const Size(0, 44),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: const StadiumBorder(),
+                textStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -313,78 +346,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
           MemoryLibraryScreen(store: widget.store, settings: widget.settings),
     ),
   );
-
-  /// 진열장 아래 이름을 누르면 바로 분위기를 바꿀 수 있습니다.
-  Future<void> _pickStyle() async {
-    final settings = widget.settings;
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: NoteColors.surface,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (c) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.only(left: 4, bottom: 8),
-                child: Text(
-                  '진열장 분위기',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: NoteColors.text,
-                  ),
-                ),
-              ),
-              for (final style in CabinetStyle.values)
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  selected: settings.cabinetStyle == style,
-                  selectedTileColor: NoteColors.surfaceHigh,
-                  leading: Icon(_styleIcon(style), color: NoteColors.gold),
-                  title: Text(
-                    style.label,
-                    style: const TextStyle(
-                      color: NoteColors.text,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  subtitle: Text(
-                    style.description,
-                    style: const TextStyle(
-                      color: NoteColors.hint,
-                      fontSize: 12,
-                    ),
-                  ),
-                  trailing: settings.cabinetStyle == style
-                      ? const Icon(Icons.check_circle, color: NoteColors.amber)
-                      : null,
-                  onTap: () {
-                    settings.setCabinetStyle(style);
-                    Navigator.of(c).pop();
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  static IconData _styleIcon(CabinetStyle s) => switch (s) {
-    CabinetStyle.woodShop => Icons.door_sliding_outlined,
-    CabinetStyle.backBar => Icons.wine_bar_outlined,
-    CabinetStyle.museum => Icons.museum_outlined,
-  };
 }
 
 class _RoundIconButton extends StatelessWidget {
@@ -565,7 +526,7 @@ class _EmptyState extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         const Text(
-          '"Add Whisky"로 첫 병을 진열해 보세요.',
+          '왼쪽 위 + 버튼으로 첫 병을 진열해 보세요.',
           textAlign: TextAlign.center,
           style: TextStyle(color: NoteColors.hint),
         ),

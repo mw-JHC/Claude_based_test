@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/scheduler.dart' show Ticker;
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:material_ui/material_ui.dart';
 
 import '../data/app_settings.dart';
@@ -14,6 +17,9 @@ import 'whisky_bottle.dart';
 /// 진열장 한 칸(페이지)은 화면 높이에 맞는 만큼의 선반을 갖고, 병이 더 많으면
 /// 옆으로 넘겨 다음 진열장을 봅니다. 넘길 때 진열장이 입체적으로 돌아갑니다.
 /// 병을 누르면 [onOpen]이 불립니다.
+///
+/// [onReorder]가 있으면 병을 길게 눌러 끌어서 자리를 바꿀 수 있습니다.
+/// 끄는 동안 다른 병들이 비켜서고, 화면 가장자리로 끌면 옆 진열장으로 넘어갑니다.
 class CabinetView extends StatefulWidget {
   const CabinetView({
     super.key,
@@ -21,10 +27,7 @@ class CabinetView extends StatefulWidget {
     required this.notes,
     required this.onOpen,
     this.style = CabinetStyle.woodShop,
-    this.onPickStyle,
-    this.onOpenMemories,
-    this.memoryCount = 0,
-    this.showFooter = true,
+    this.onReorder,
     this.emptyMessage,
   });
 
@@ -33,17 +36,8 @@ class CabinetView extends StatefulWidget {
   final void Function(TastingNote note) onOpen;
   final CabinetStyle style;
 
-  /// 아래쪽 진열장 이름을 누르면 불립니다 (분위기 바꾸기). null이면 숨김.
-  final VoidCallback? onPickStyle;
-
-  /// 아래쪽 Memory Library 버튼을 누르면 불립니다. null이면 숨김.
-  final VoidCallback? onOpenMemories;
-
-  /// Memory Library 버튼에 보여줄 빈 병 수
-  final int memoryCount;
-
-  /// 아래쪽 줄 (진열장 이름, 페이지 표시). 설정 미리보기에서는 숨깁니다.
-  final bool showFooter;
+  /// 끌어서 놓으면 새 순서(노트 id 목록)로 불립니다. null이면 순서를 못 바꿉니다.
+  final void Function(List<String> ids)? onReorder;
 
   /// 진열할 병이 없을 때 진열장 위에 띄울 안내.
   final Widget? emptyMessage;
@@ -64,13 +58,31 @@ class _Layout {
 }
 
 class _CabinetViewState extends State<CabinetView> {
-  static const _footerHeight = 58.0;
-
   final _pages = PageController();
+  final _pagesBox = GlobalKey();
   int _page = 0;
+  int _pageCount = 1;
+
+  /// 끌고 있는 병과, 지금 놓으면 들어갈 자리
+  String? _dragId;
+  int? _hover;
+
+  /// 놓은 직후 잠깐 동안도 병들이 부드럽게 자리를 잡도록
+  bool _settling = false;
+
+  /// 병마다 마지막으로 그려진 화면 위치 (자리 이동 애니메이션용)
+  final Map<String, Offset> _positions = {};
+
+  DateTime? _edgeSince;
+  int _edgeDir = 0;
+
+  Timer? _settleTimer;
+
+  bool get _animateMoves => _dragId != null || _settling;
 
   @override
   void dispose() {
+    _settleTimer?.cancel();
     _pages.dispose();
     super.dispose();
   }
@@ -107,28 +119,183 @@ class _CabinetViewState extends State<CabinetView> {
     return _page.toDouble();
   }
 
-  Widget _bottle(TastingNote note, double height, {double reflection = 0}) =>
-      _PressableBottle(
-        label: note.name,
-        onTap: () => widget.onOpen(note),
-        child: BottleFigure(
-          note: note,
-          cutout: widget.store.storage.image(note.cutout),
-          photo: widget.store.storage.image(note.photo),
-          height: height,
-          reflection: reflection,
-        ),
+  /// 끄는 중이면 끌고 있는 병을 놓을 자리로 옮긴 순서 (미리보기).
+  List<TastingNote> get _display {
+    final notes = widget.notes;
+    final id = _dragId, hover = _hover;
+    if (id == null || hover == null) return notes;
+    final dragged = notes.where((n) => n.id == id).firstOrNull;
+    if (dragged == null) return notes;
+    final rest = [...notes]..remove(dragged);
+    return rest..insert(hover.clamp(0, rest.length), dragged);
+  }
+
+  void _startDrag(TastingNote note) {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _dragId = note.id;
+      _hover = widget.notes.indexOf(note);
+    });
+  }
+
+  void _hoverAt(int index) {
+    if (_dragId == null || _hover == index) return;
+    HapticFeedback.selectionClick();
+    setState(() => _hover = index);
+  }
+
+  void _drop(Offset feedbackTopLeft) {
+    final id = _dragId;
+    if (id == null) return;
+    final order = _display.map((n) => n.id).toList();
+    // 놓은 병은 손가락 자리에서 선반 자리로 미끄러져 들어갑니다.
+    _positions[id] = feedbackTopLeft;
+    _finishDrag();
+    widget.onReorder?.call(order);
+  }
+
+  void _finishDrag() {
+    _edgeSince = null;
+    _edgeDir = 0;
+    if (!mounted) return;
+    setState(() {
+      _dragId = null;
+      _hover = null;
+      _settling = true;
+    });
+    _settleTimer?.cancel();
+    _settleTimer = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) setState(() => _settling = false);
+    });
+  }
+
+  /// 끌고 있는 병이 화면 가장자리에 잠시 머물면 옆 진열장으로 넘깁니다.
+  void _dragMoved(Offset center) {
+    final box = _pagesBox.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached) return;
+    final local = box.globalToLocal(center);
+    final dir = local.dx < 36
+        ? -1
+        : local.dx > box.size.width - 36
+        ? 1
+        : 0;
+    if (dir == 0) {
+      _edgeSince = null;
+      _edgeDir = 0;
+      return;
+    }
+    final now = DateTime.now();
+    if (_edgeDir != dir) {
+      _edgeDir = dir;
+      _edgeSince = now;
+      return;
+    }
+    if (now.difference(_edgeSince!) < const Duration(milliseconds: 550)) return;
+    final target = _page + dir;
+    _edgeSince = now; // 계속 머물면 다음 칸도 넘김
+    if (target < 0 || target >= _pageCount) return;
+    _pages.animateToPage(
+      target,
+      duration: const Duration(milliseconds: 380),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  Widget _figure(TastingNote note, double height, {double reflection = 0}) =>
+      BottleFigure(
+        note: note,
+        cutout: widget.store.storage.image(note.cutout),
+        photo: widget.store.storage.image(note.photo),
+        height: height,
+        reflection: reflection,
       );
+
+  /// 선반 위의 병 한 칸: 누르면 열기, 길게 누르고 끌면 자리 바꾸기.
+  Widget _bottle(
+    TastingNote note,
+    int index,
+    double height, {
+    double reflection = 0,
+  }) {
+    final dragging = note.id == _dragId;
+    Widget bottle = _PressableBottle(
+      label: note.name,
+      onTap: () => widget.onOpen(note),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 150),
+        // 끌고 있는 병의 원래 자리에는 흐린 자국만 남깁니다.
+        opacity: dragging ? 0.22 : 1,
+        child: _figure(note, height, reflection: reflection),
+      ),
+    );
+    if (widget.onReorder != null) {
+      bottle = LongPressDraggable<String>(
+        data: note.id,
+        delay: const Duration(milliseconds: 280),
+        hapticFeedbackOnStart: false,
+        onDragStarted: () => _startDrag(note),
+        // 병이 새 자리로 미끄러지는 중에 손을 떼면 놓을 자리를 못 찾을 수 있어서,
+        // 그때도 미리보기로 보여준 자리에 놓습니다.
+        onDraggableCanceled: (_, offset) => _drop(offset),
+        feedback: _DragFeedback(
+          onMove: _dragMoved,
+          child: _figure(note, height),
+        ),
+        childWhenDragging: bottle,
+        child: bottle,
+      );
+      bottle = _target(index, bottle);
+    }
+    return _Flip(
+      id: note.id,
+      positions: _positions,
+      enabled: _animateMoves,
+      child: bottle,
+    );
+  }
+
+  /// 병을 놓을 수 있는 자리. 끌고 있는 병이 올라오면 그 자리로 미리 옮겨 봅니다.
+  Widget _target(int index, Widget child) => DragTarget<String>(
+    onWillAcceptWithDetails: (_) {
+      _hoverAt(index);
+      return true;
+    },
+    onAcceptWithDetails: (d) => _drop(d.offset),
+    builder: (context, _, _) => child,
+  );
+
+  /// 비어 있는 칸: 끄는 중에만 놓을 자리로 보입니다.
+  Widget _emptySlot(int index, double height) {
+    if (widget.onReorder == null) return const SizedBox.shrink();
+    return _target(
+      index,
+      AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: height * 0.42,
+        height: height * 0.9,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: _dragId == null
+              ? null
+              : Border.all(color: NoteColors.gold.withValues(alpha: 0.35)),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, box) {
-        final footer = widget.showFooter ? _footerHeight : 0.0;
-        final size = Size(box.maxWidth, box.maxHeight - footer);
+        final size = Size(box.maxWidth, box.maxHeight);
         final layout = _layout(size);
-        final notes = widget.notes;
-        final pageCount = math.max(1, (notes.length / layout.capacity).ceil());
+        final notes = _display;
+        // 끄는 동안 마지막 진열장 뒤 빈 칸에도 놓을 수 있게 칸 수는 원래대로.
+        final pageCount = math.max(
+          1,
+          (widget.notes.length / layout.capacity).ceil(),
+        );
+        _pageCount = pageCount;
         if (_page >= pageCount) {
           // 필터나 삭제로 병이 줄어 마지막 진열장이 사라졌을 때.
           _page = pageCount - 1;
@@ -138,6 +305,7 @@ class _CabinetViewState extends State<CabinetView> {
         }
 
         final pages = PageView.builder(
+          key: _pagesBox,
           controller: _pages,
           itemCount: pageCount,
           // 한 칸뿐이어도 끌면 살짝 돌아갔다가 돌아옵니다.
@@ -145,10 +313,6 @@ class _CabinetViewState extends State<CabinetView> {
           onPageChanged: (i) => setState(() => _page = i),
           itemBuilder: (context, i) {
             final start = i * layout.capacity;
-            final slice = notes.sublist(
-              math.min(start, notes.length),
-              math.min(start + layout.capacity, notes.length),
-            );
             return AnimatedBuilder(
               animation: _pages,
               builder: (context, _) {
@@ -161,33 +325,26 @@ class _CabinetViewState extends State<CabinetView> {
                   transform: Matrix4.identity()
                     ..setEntry(3, 2, 0.0012)
                     ..rotateY(delta * 0.85),
-                  child: _cabinet(layout, slice, delta * 0.35),
+                  child: _cabinet(layout, notes, start, delta * 0.35),
                 );
               },
             );
           },
         );
 
-        return Column(
+        return Stack(
           children: [
-            Expanded(
-              child: Stack(
-                children: [
-                  Positioned.fill(child: pages),
-                  if (notes.isEmpty && widget.emptyMessage != null)
-                    Center(child: widget.emptyMessage),
-                  // 몇 번째 진열장인지 (진열장 아래 테두리 위에 겹쳐 표시)
-                  if (pageCount > 1)
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: IgnorePointer(child: _pageDots(pageCount)),
-                    ),
-                ],
+            Positioned.fill(child: pages),
+            if (widget.notes.isEmpty && widget.emptyMessage != null)
+              Center(child: widget.emptyMessage),
+            // 몇 번째 진열장인지 (진열장 아래 테두리 위에 겹쳐 표시)
+            if (pageCount > 1)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: IgnorePointer(child: _pageDots(pageCount)),
               ),
-            ),
-            if (widget.showFooter) _footer(pageCount),
           ],
         );
       },
@@ -218,68 +375,21 @@ class _CabinetViewState extends State<CabinetView> {
     ],
   );
 
-  Widget _footer(int pageCount) {
-    const textStyle = TextStyle(fontSize: 13, fontWeight: FontWeight.w600);
-    return SizedBox(
-      height: _footerHeight,
-      child: Padding(
-        // 오른쪽은 Add Whisky 버튼 자리
-        padding: const EdgeInsets.only(left: 8, right: 170),
-        child: Row(
-          children: [
-            // 분위기 버튼은 필요한 만큼만, 남는 자리는 Memories 버튼이 씁니다.
-            if (widget.onPickStyle != null)
-              TextButton.icon(
-                onPressed: widget.onPickStyle,
-                icon: const Icon(Icons.swap_horiz, size: 18),
-                label: Text(
-                  widget.style.shortLabel,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                style: TextButton.styleFrom(
-                  foregroundColor: NoteColors.hint,
-                  textStyle: textStyle,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                ),
-              ),
-            if (widget.onOpenMemories != null)
-              Flexible(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: OutlinedButton.icon(
-                    onPressed: widget.onOpenMemories,
-                    icon: const Icon(Icons.auto_stories_outlined, size: 17),
-                    label: Text(
-                      widget.memoryCount > 0
-                          ? 'Memories ${widget.memoryCount}'
-                          : 'Memories',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: NoteColors.gold,
-                      side: BorderSide(
-                        color: NoteColors.gold.withValues(alpha: 0.5),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      minimumSize: const Size(0, 38),
-                      shape: const StadiumBorder(),
-                      textStyle: textStyle,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _cabinet(_Layout layout, List<TastingNote> notes, double tilt) {
+  /// 한 진열장: [all] 중 [start]번째부터 이 진열장 칸 수만큼.
+  Widget _cabinet(
+    _Layout layout,
+    List<TastingNote> all,
+    int start,
+    double tilt,
+  ) {
     final rows = [
       for (var r = 0; r < layout.rows; r++)
-        notes.sublist(
-          math.min(r * layout.perRow, notes.length),
-          math.min((r + 1) * layout.perRow, notes.length),
+        (
+          start + r * layout.perRow,
+          all.sublist(
+            math.min(start + r * layout.perRow, all.length),
+            math.min(start + (r + 1) * layout.perRow, all.length),
+          ),
         ),
     ];
     return switch (widget.style) {
@@ -291,7 +401,11 @@ class _CabinetViewState extends State<CabinetView> {
 
   // ───────────────────────── 고급 위스키숍 원목장 ─────────────────────────
 
-  Widget _woodShop(_Layout layout, List<List<TastingNote>> rows, double tilt) {
+  Widget _woodShop(
+    _Layout layout,
+    List<(int, List<TastingNote>)> rows,
+    double tilt,
+  ) {
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
       decoration: BoxDecoration(
@@ -318,13 +432,15 @@ class _CabinetViewState extends State<CabinetView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (final row in rows)
+            for (final (base, row) in rows)
               Expanded(
                 child: _WoodShelf(
                   slots: layout.perRow,
                   tilt: tilt,
                   notes: row,
-                  bottle: (n) => _bottle(n, layout.bottle),
+                  bottle: (n) =>
+                      _bottle(n, base + row.indexOf(n), layout.bottle),
+                  emptySlot: (i) => _emptySlot(base + i, layout.bottle),
                 ),
               ),
           ],
@@ -335,7 +451,11 @@ class _CabinetViewState extends State<CabinetView> {
 
   // ───────────────────────── 바 뒤편 진열장 ─────────────────────────
 
-  Widget _backBar(_Layout layout, List<List<TastingNote>> rows, double tilt) {
+  Widget _backBar(
+    _Layout layout,
+    List<(int, List<TastingNote>)> rows,
+    double tilt,
+  ) {
     return Container(
       margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
       decoration: BoxDecoration(
@@ -360,20 +480,21 @@ class _CabinetViewState extends State<CabinetView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (final row in rows)
+            for (final (base, row) in rows)
               Expanded(
                 child: _BarShelf(
                   slots: layout.perRow,
                   tilt: tilt,
                   notes: row,
                   bottle: (n, mirror) => mirror
-                      ? BottleFigure(
-                          note: n,
-                          cutout: widget.store.storage.image(n.cutout),
-                          photo: widget.store.storage.image(n.photo),
-                          height: layout.bottle,
-                        )
-                      : _bottle(n, layout.bottle, reflection: 16),
+                      ? _figure(n, layout.bottle)
+                      : _bottle(
+                          n,
+                          base + row.indexOf(n),
+                          layout.bottle,
+                          reflection: 16,
+                        ),
+                  emptySlot: (i) => _emptySlot(base + i, layout.bottle),
                 ),
               ),
           ],
@@ -384,7 +505,11 @@ class _CabinetViewState extends State<CabinetView> {
 
   // ───────────────────────── 박물관 유리 케이스 ─────────────────────────
 
-  Widget _museum(_Layout layout, List<List<TastingNote>> rows, double tilt) {
+  Widget _museum(
+    _Layout layout,
+    List<(int, List<TastingNote>)> rows,
+    double tilt,
+  ) {
     return DecoratedBox(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -398,18 +523,26 @@ class _CabinetViewState extends State<CabinetView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (final row in rows)
+            for (final (base, row) in rows)
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (var i = 0; i < 2; i++)
                       Expanded(
-                        child: _MuseumCase(
-                          note: i < row.length ? row[i] : null,
-                          tilt: tilt,
-                          bottle: (n) =>
-                              _bottle(n, layout.bottle, reflection: 14),
+                        // 케이스 전체가 놓을 자리
+                        child: _maybeTarget(
+                          base + i,
+                          _MuseumCase(
+                            note: i < row.length ? row[i] : null,
+                            tilt: tilt,
+                            bottle: (n) => _bottle(
+                              n,
+                              base + i,
+                              layout.bottle,
+                              reflection: 14,
+                            ),
+                          ),
                         ),
                       ),
                   ],
@@ -418,6 +551,142 @@ class _CabinetViewState extends State<CabinetView> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _maybeTarget(int index, Widget child) =>
+      widget.onReorder == null ? child : _target(index, child);
+}
+
+/// 끌고 있는 병: 살짝 들려 커지고, 움직이는 방향으로 기울었다가 멈추면 바로 섭니다.
+class _DragFeedback extends StatefulWidget {
+  const _DragFeedback({required this.child, required this.onMove});
+
+  final Widget child;
+
+  /// 매 프레임 병 가운데의 화면 위치 (가장자리 넘김용)
+  final void Function(Offset center) onMove;
+
+  @override
+  State<_DragFeedback> createState() => _DragFeedbackState();
+}
+
+class _DragFeedbackState extends State<_DragFeedback>
+    with SingleTickerProviderStateMixin {
+  late final Ticker _ticker = createTicker(_tick)..start();
+  Offset? _last;
+  double _tilt = 0;
+  double _lift = 0;
+
+  void _tick(Duration _) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) return;
+    final pos = box.localToGlobal(box.size.center(Offset.zero));
+    final dx = _last == null ? 0.0 : pos.dx - _last!.dx;
+    _last = pos;
+    widget.onMove(pos);
+    // 움직이는 방향으로 기울고, 멈추면 스프링처럼 돌아옵니다.
+    final target = (dx * 0.045).clamp(-0.45, 0.45);
+    setState(() {
+      _tilt += (target - _tilt) * 0.22;
+      _lift += (1 - _lift) * 0.2;
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: Transform.translate(
+        offset: Offset(0, -10 * _lift),
+        child: Transform.rotate(
+          angle: _tilt,
+          alignment: Alignment.bottomCenter,
+          child: Transform.scale(
+            scale: 1 + 0.12 * _lift,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.45 * _lift),
+                    blurRadius: 24,
+                    offset: const Offset(0, 18),
+                  ),
+                ],
+              ),
+              child: widget.child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 자리가 바뀐 병이 예전 자리에서 새 자리로 미끄러져 가게 합니다.
+/// (그려진 뒤 화면 위치를 재서, 바뀌었으면 그 차이만큼 되돌렸다가 0으로)
+class _Flip extends StatefulWidget {
+  const _Flip({
+    required this.id,
+    required this.positions,
+    required this.enabled,
+    required this.child,
+  });
+
+  final String id;
+  final Map<String, Offset> positions;
+  final bool enabled;
+  final Widget child;
+
+  @override
+  State<_Flip> createState() => _FlipState();
+}
+
+class _FlipState extends State<_Flip> with SingleTickerProviderStateMixin {
+  late final AnimationController _anim = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 280),
+  );
+  Offset _from = Offset.zero;
+
+  Offset get _current =>
+      _from * (1 - Curves.easeOutCubic.transform(_anim.value));
+
+  @override
+  void dispose() {
+    _anim.dispose();
+    super.dispose();
+  }
+
+  void _measure(Duration _) {
+    if (!mounted) return;
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) return;
+    final now = box.localToGlobal(Offset.zero);
+    final before = widget.positions[widget.id];
+    widget.positions[widget.id] = now;
+    if (!widget.enabled || before == null) return;
+    final jump = before + _current - now;
+    // 진열장을 넘길 때처럼 아주 멀리 가는 경우는 애니메이션하지 않습니다.
+    if (jump.distance < 1 || jump.distance > 900) return;
+    _from = jump;
+    _anim.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback(_measure);
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (context, child) =>
+          Transform.translate(offset: _current, child: child),
+      child: widget.child,
     );
   }
 }
@@ -430,6 +699,7 @@ class _WoodShelf extends StatelessWidget {
     required this.tilt,
     required this.notes,
     required this.bottle,
+    required this.emptySlot,
   });
 
   static const board = 40.0;
@@ -438,6 +708,9 @@ class _WoodShelf extends StatelessWidget {
   final double tilt;
   final List<TastingNote> notes;
   final Widget Function(TastingNote) bottle;
+
+  /// 빈 칸 (끌어 놓을 자리)
+  final Widget Function(int slot) emptySlot;
 
   @override
   Widget build(BuildContext context) {
@@ -495,6 +768,7 @@ class _WoodShelf extends StatelessWidget {
               notes,
               (n) => bottle(n),
               CrossAxisAlignment.end,
+              emptySlot,
             ),
           ),
           Positioned(
@@ -692,6 +966,7 @@ class _BarShelf extends StatelessWidget {
     required this.tilt,
     required this.notes,
     required this.bottle,
+    required this.emptySlot,
   });
 
   static const glass = 30.0;
@@ -699,6 +974,9 @@ class _BarShelf extends StatelessWidget {
   final int slots;
   final double tilt;
   final List<TastingNote> notes;
+
+  /// 빈 칸 (끌어 놓을 자리)
+  final Widget Function(int slot) emptySlot;
 
   /// mirror=true면 거울에 비친 (누를 수 없는) 병.
   final Widget Function(TastingNote, bool mirror) bottle;
@@ -788,6 +1066,7 @@ class _BarShelf extends StatelessWidget {
               notes,
               (n) => bottle(n, false),
               CrossAxisAlignment.end,
+              emptySlot,
             ),
           ),
           // 선반 아래 작은 이름
@@ -1160,6 +1439,7 @@ Widget _slotRow(
   List<TastingNote> notes,
   Widget Function(TastingNote) build, [
   CrossAxisAlignment align = CrossAxisAlignment.center,
+  Widget Function(int slot)? empty,
 ]) {
   return Row(
     crossAxisAlignment: align,
@@ -1168,7 +1448,9 @@ Widget _slotRow(
         Expanded(
           child: i < notes.length
               ? Center(child: build(notes[i]))
-              : const SizedBox.shrink(),
+              : (empty == null
+                    ? const SizedBox.shrink()
+                    : Center(child: empty(i))),
         ),
     ],
   );

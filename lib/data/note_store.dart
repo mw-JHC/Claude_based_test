@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -128,10 +129,14 @@ class NoteStore extends ChangeNotifier {
   final List<TastingNote> _notes = [];
   bool loaded = false;
 
-  /// 최근에 수정한 노트가 위로 오도록 정렬된 목록.
-  List<TastingNote> get notes => List.unmodifiable(
-    [..._notes]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)),
-  );
+  /// 진열장 순서대로 정렬된 목록 (끌어서 바꾼 순서).
+  List<TastingNote> get notes =>
+      List<TastingNote>.unmodifiable(<TastingNote>[..._notes]..sort(_byOrder));
+
+  static int _byOrder(TastingNote a, TastingNote b) {
+    final c = a.order.compareTo(b.order);
+    return c != 0 ? c : b.updatedAt.compareTo(a.updatedAt);
+  }
 
   /// 진열장에 있는 (아직 비우지 않은) 병들
   List<TastingNote> get library => notes.where((n) => !n.isEmpty).toList();
@@ -152,6 +157,11 @@ class NoteStore extends ChangeNotifier {
     _notes
       ..clear()
       ..addAll(await storage.loadAll());
+    // 순서가 없던 예전 노트는 최근 수정 순으로 자리를 매깁니다.
+    final sorted = [..._notes]..sort(_byOrder);
+    for (var i = 0; i < sorted.length; i++) {
+      sorted[i].order = i;
+    }
     loaded = true;
     notifyListeners();
   }
@@ -164,6 +174,10 @@ class NoteStore extends ChangeNotifier {
     if (i >= 0) {
       _notes[i] = note;
     } else {
+      // 새 병은 진열장 맨 앞에 놓습니다.
+      note.order = _notes.isEmpty
+          ? 0
+          : _notes.map((n) => n.order).reduce(math.min) - 1;
       _notes.add(note);
     }
     await storage.saveAll(_notes);
@@ -173,6 +187,18 @@ class NoteStore extends ChangeNotifier {
         await storage.deletePhoto(name);
       }
     }
+    notifyListeners();
+  }
+
+  /// 끌어서 놓은 새 순서. [ids]는 화면에 보이던 병들(필터가 걸렸으면 그 일부)이고,
+  /// 그 병들이 차지하던 자리 번호를 새 순서대로 다시 나눠 줍니다.
+  Future<void> reorder(List<String> ids) async {
+    final picked = [for (final id in ids) ?byId(id)];
+    final slots = picked.map((n) => n.order).toList()..sort();
+    for (var i = 0; i < picked.length; i++) {
+      picked[i].order = slots[i];
+    }
+    await storage.saveAll(_notes);
     notifyListeners();
   }
 

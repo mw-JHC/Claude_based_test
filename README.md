@@ -6,6 +6,7 @@
 
 - 앱 아이콘, 시작 화면: `assets/brand/` (원본 SVG 포함)
 - Google Play 출시 순서 (서명 키, AAB 빌드, Play Console): [RELEASE.md](RELEASE.md)
+- 친구들에게 보낼 안드로이드 다운로드 링크 (무료, GitHub Releases): [docs/DOWNLOAD_LINK.md](docs/DOWNLOAD_LINK.md)
 - 스토어 등록정보 글, 데이터 보안 답변: [store/LISTING.md](store/LISTING.md)
 - 개인정보처리방침: [store/PRIVACY.md](store/PRIVACY.md)
 - 스토어 이미지: `store/icon_512.png`, `store/feature_graphic.jpg`, `store/screenshots/`

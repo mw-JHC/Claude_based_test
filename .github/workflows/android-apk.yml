@@ -50,7 +50,8 @@ jobs:
         if: steps.key.outputs.ok == 'true'
         with:
           distribution: temurin
-          java-version: "17"
+          # Android Studio와 같은 Java 21 (17이면 카메라 플러그인 검사(lint)가 멈춤)
+          java-version: "21"
 
       - uses: subosito/flutter-action@v2
         if: steps.key.outputs.ok == 'true'

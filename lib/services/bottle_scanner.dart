@@ -34,14 +34,24 @@ class MlKitBottleScanner implements BottleScanner {
       ),
     );
     try {
-      final result = await segmenter.processImage(
-        InputImage.fromFilePath(imagePath),
-      );
-      return pickBottle(result.subjects)?.bitmap;
+      // 폰에서 처음 쓰면 구글 서비스가 배경 제거 모듈을 내려받는 동안
+      // "기다려 주세요" 오류가 나서, 잠깐씩 기다리며 몇 번 다시 해 봅니다.
+      for (var attempt = 0; ; attempt++) {
+        try {
+          final result = await segmenter.processImage(
+            InputImage.fromFilePath(imagePath),
+          );
+          return pickBottle(result.subjects)?.bitmap;
+        } on PlatformException catch (e) {
+          debugPrint('배경 제거 실패: ${e.code} ${e.message}');
+          final text = '${e.code} ${e.message}'.toLowerCase();
+          final downloading =
+              text.contains('download') || text.contains('wait');
+          if (!downloading || attempt >= 4) return null;
+          await Future<void>.delayed(const Duration(seconds: 3));
+        }
+      }
     } on MissingPluginException {
-      return null;
-    } on PlatformException catch (e) {
-      debugPrint('배경 제거 실패: ${e.code} ${e.message}');
       return null;
     } finally {
       await segmenter.close().catchError((_) {});

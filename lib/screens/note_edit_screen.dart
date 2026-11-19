@@ -63,6 +63,9 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
       : _Look.photo;
   bool _photoRemoved = false;
   bool _processing = false;
+
+  /// '병만' 버튼을 눌러 배경 제거를 다시 하는 중
+  bool _cutting = false;
   bool _saving = false;
 
   /// 라벨에서 읽은 글자들 (눌러서 이름에 덧붙이기).
@@ -132,8 +135,8 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     final parts = [
       if (cutout == null)
         tr(
-          '이 기기에서는 배경을 지우지 못해 원본 사진을 씁니다.',
-          'Background removal is not available here, so the original photo is used.',
+          '배경을 지우지 못해 원본 사진을 씁니다. 잠시 뒤 "병만"을 눌러 다시 해 볼 수 있어요.',
+          'Could not remove the background, so the original photo is used. Tap "Bottle only" to try again in a moment.',
         ),
       if (filled.isNotEmpty)
         tr(
@@ -258,6 +261,13 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
         _note
           ..photo = null
           ..cutout = null;
+      } else if (_pickedCutout != null && _look != _Look.photo) {
+        // 저장된 사진에서 '병만'을 다시 만들었을 때
+        _note.cutout = await storage.importBytes(
+          _pickedCutout!,
+          _note.id,
+          '.png',
+        );
       } else if (_look == _Look.photo) {
         _note.cutout = null;
       }
@@ -281,10 +291,46 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
 
   ImageProvider? get _cutoutImage {
     if (_photoRemoved) return null;
-    if (_pickedPhoto != null) {
-      return _pickedCutout == null ? null : MemoryImage(_pickedCutout!);
-    }
+    if (_pickedCutout != null) return MemoryImage(_pickedCutout!);
+    if (_pickedPhoto != null) return null;
     return widget.store.storage.image(_note.cutout);
+  }
+
+  /// 배경 제거를 다시 해 봅니다. 폰에서 처음 쓸 때는 구글 서비스가 필요한
+  /// 파일을 받는 동안 실패할 수 있어서, 사용자가 '병만'을 눌러 다시 시도합니다.
+  Future<void> _makeCutout() async {
+    setState(() => _cutting = true);
+    Uint8List? result;
+    try {
+      var path = _pickedPhoto;
+      if (path == null && _note.photo != null) {
+        final bytes = await widget.store.storage.readPhoto(_note.photo!);
+        if (bytes != null) {
+          final f = File('${Directory.systemTemp.path}/cutout_${_note.id}.jpg');
+          await f.writeAsBytes(bytes);
+          path = f.path;
+        }
+      }
+      if (path != null) result = await widget.scanner.cutout(path);
+    } catch (_) {
+      result = null;
+    }
+    if (!mounted) return;
+    setState(() {
+      _cutting = false;
+      if (result != null) {
+        _pickedCutout = result;
+        _look = _Look.cutout;
+      }
+    });
+    if (result == null) {
+      _snack(
+        tr(
+          '아직 배경을 지우지 못했어요. 이 기능을 처음 쓰면 구글 서비스가 필요한 파일을 받는 데 시간이 걸려요. 와이파이에 연결하고 1~2분 뒤 다시 눌러 주세요.',
+          'The background could not be removed yet. The first time, Google services need to download a component. Connect to Wi-Fi and try again in a minute or two.',
+        ),
+      );
+    }
   }
 
   @override
@@ -608,12 +654,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
               runSpacing: 4,
               children: [
                 for (final (look, icon, label) in [
-                  if (cutout != null)
-                    (
-                      _Look.cutout,
-                      Icons.auto_awesome,
-                      tr('병만 (진열장용)', 'Bottle only (cabinet)'),
-                    ),
+                  (
+                    _Look.cutout,
+                    Icons.auto_awesome,
+                    tr('병만 (진열장용)', 'Bottle only (cabinet)'),
+                  ),
                   (
                     _Look.photo,
                     Icons.image_outlined,
@@ -626,7 +671,13 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                   ),
                 ])
                   ChoiceChip(
-                    avatar: Icon(icon, size: 18),
+                    avatar: look == _Look.cutout && _cutting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(icon, size: 18),
                     showCheckmark: false,
                     label: Text(label),
                     selected:
@@ -634,7 +685,16 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                         (_look == _Look.cutout && cutout == null
                             ? _Look.photo
                             : _look),
-                    onSelected: (_) => setState(() => _look = look),
+                    onSelected: _cutting
+                        ? null
+                        : (_) {
+                            // 오려낸 병이 아직 없으면 배경 제거를 다시 해 봅니다.
+                            if (look == _Look.cutout && cutout == null) {
+                              _makeCutout();
+                            } else {
+                              setState(() => _look = look);
+                            }
+                          },
                   ),
               ],
             ),
